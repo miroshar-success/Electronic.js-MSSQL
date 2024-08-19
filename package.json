@@ -8,7 +8,7 @@
     "make": "electron-forge make"
   },
   "devDependencies": {
-    "electron": "latest",
+    "electron": "^31.4.0",
     "electron-builder": "latest",
     "mysql2": "latest"
   },
