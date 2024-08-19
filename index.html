@@ -323,7 +323,6 @@
             const csvRows = [];
             const headers = Object.keys(data[0]);
             csvRows.push(headers.join(','));
-
             for (const row of data) {
                 const values = headers.map(header => {
                     const escaped = ('' + row[header]).replace(/"/g, '\\"');
@@ -356,14 +355,35 @@
         };
 
         document.getElementById('export-pdf').addEventListener('click', () => {
-            const data = JSON.parse(outputDiv.dataset.result);
+            let data = JSON.parse(outputDiv.dataset.result);
+
+            // Convert the "time@timestamp" values to a readable date format
+            data = data.map(row => {
+                if (row['time@timestamp']) {
+                    const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
+                    row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                }
+                return row;
+            });
+
             exportToPDF(data);
         });
 
         document.getElementById('export-csv').addEventListener('click', () => {
-            const data = JSON.parse(outputDiv.dataset.result);
+            let data = JSON.parse(outputDiv.dataset.result);
+
+            // Convert the "time@timestamp" values to a readable date format
+            data = data.map(row => {
+                if (row['time@timestamp']) {
+                    const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
+                    row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                }
+                return row;
+            });
+
             exportToCSV(data);
         });
+
 
         // document.getElementById('btn__get-graph').addEventListener('click', function() {
         //     const periodFrom = document.getElementById('PeriodFrom').value;
