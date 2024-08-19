@@ -1,0 +1,37 @@
+{
+  "name": "my-electron-sql-app",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "make": "electron-forge make"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest",
+    "mysql2": "latest"
+  },
+  "build": {
+    "appId": "com.example.electronapp",
+    "productName": "MyElectronApp",
+    "files": [
+      "main.js",
+      "index.html",
+      "db.js",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": "nsis",
+      "sign": false
+    }
+  },
+  "dependencies": {
+    "7zip-bin": "^5.2.0",
+    "electron-forge": "^5.2.4",
+    "mssql": "^11.0.1"
+  }
+}

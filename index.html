@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Richmond System</title>
+    <style>
+        .noborder { border: none; }
+        .input--medium { width: 200px; }
+        #period-from-to { display: none; } /* Initially hide the period-from-to section */
+        #period_table { margin-top: 15px; margin-bottom: 15px;}
+    </style>
+    <style>
+        table {
+            border: 1px solid #ccc;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            height: 24px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+    <style>
+        /* Style for the select element */
+        #data-select {
+            padding: 10px; /* Add padding */
+            font-size: 16px; /* Increase font size */
+            width: 120px; /* Set width */
+        }
+
+        #data-format-select {
+            padding: 10px; /* Add padding */
+            font-size: 16px; /* Increase font size */
+            width: 250px; /* Set width */
+        }
+    
+        /* Style for buttons */
+        button {
+            padding: 10px 20px; /* Add padding */
+            font-size: 16px; /* Increase font size */
+            margin: 10px 10px; /* Space between buttons */
+            cursor: pointer; /* Change cursor on hover */
+        }
+
+    </style>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #output { white-space: pre-wrap; background: #f4f4f4; padding: 10px; border: 1px solid #ccc; }
+        /* table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } */
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <h1>Richmond System</h1>
+    
+    <label for="data-select">Select Data Source:</label>
+    <select id="data-select" onchange="fetchTableFormats()"></select>
+    <select id="data-format-select" onchange="getTableData()"></select>
+
+    <button id="export-pdf">Export to PDF</button>
+    <button id="export-csv">Export to CSV</button>
+
+    <table id="period_table">
+        <tr id="graph-period" class="noborder">
+            <th class="cell--default">Period</th>
+            <td>
+                <div class="input__radio-2__wrap">
+                    <input type="radio" checked="checked" class="input__radio-2" id="period-day" value="OneDay" name="period">
+                    <label for="period-day">1 Day</label>
+                    
+                    <input type="radio" class="input__radio-2" id="period-week" value="OneWeek" name="period">
+                    <label for="period-week">1 Week</label>
+                    
+                    <!-- <input type="radio" class="input__radio-2" id="period-month" value="OneMonth" name="period">
+                    <label for="period-month">1 Month</label>
+                    
+                    <input type="radio" class="input__radio-2" id="period-half-year" value="HalfYear" name="period">
+                    <label for="period-half-year">6 Months</label>
+                    
+                    <input type="radio" class="input__radio-2" id="period-year" value="OneYear" name="period">
+                    <label for="period-year">1 Year</label>
+                    
+                    <input type="radio" class="input__radio-2" id="period-custom" value="Custom" name="period">
+                    <label for="period-custom">Custom</label> -->
+                </div>
+            </td>
+            <td></td>
+        </tr>
+    
+        <tr id="period-from-to">
+            <th></th>
+            <td>
+                <input value="2024-08-18T00:00" class="input input--text input--medium" id="PeriodFrom" name="PeriodFrom" type="datetime-local">
+                <span class="field-validation-valid" data-valmsg-for="PeriodFrom"></span>
+                -
+                <input value="2024-08-19T10:00" class="input input--text input--medium" id="PeriodTo" name="PeriodTo" type="datetime-local">
+                <span class="field-validation-valid" data-valmsg-for="PeriodTo"></span>
+                <!-- <button class="btn btn--low column__box--solo" type="button" id="btn__get-graph">Confirm</button> -->
+            </td>
+            <td></td>
+        </tr>
+    </table>    
+
+    <div id="output"></div>
+    
+    <script>
+        const { connectToDatabase, queryDatabase } = require('./db');
+        // Declare outputDiv at the top
+        const outputDiv = document.getElementById('output');
+        const fetchTableNames = async () => {
+            try {
+                await connectToDatabase();
+                const tables = await queryDatabase("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';");
+                const selectElement = document.getElementById('data-select');
+                const filteredTables = tables.filter(table => table.TABLE_NAME.endsWith('_data'));
+
+                // Populate the select element with filtered table names
+                filteredTables.forEach(table => {
+                    const option = document.createElement('option');
+                    option.value = table.TABLE_NAME;
+                    option.textContent = table.TABLE_NAME;
+                    selectElement.appendChild(option);
+                });
+
+                selectElement.innerHTML = '';
+                filteredTables.forEach(table => {
+                    const tableName = table.TABLE_NAME.replace(/^cMT-4429_/, '').replace(/_data$/, '');
+                    const option = document.createElement('option');
+                    option.value = table.TABLE_NAME;
+                    option.textContent = tableName;
+                    selectElement.appendChild(option);
+                });
+
+                await fetchTableFormats();
+
+            } catch (error) {
+                console.error('Error fetching table names:', error);
+            }
+        };
+
+        const fetchTableFormats = async () => {
+            try {
+                await connectToDatabase();
+                const selectFormatElement = document.getElementById('data-format-select');
+                selectFormatElement.innerHTML = '';
+
+                const selectElement = document.getElementById('data-select');
+                const selectedData = selectElement.value;
+
+                const dataFormatIndexs = await queryDatabase(`SELECT * FROM [${selectedData}_format];`);
+                dataFormatIndexs.forEach(format => {
+                    const option = document.createElement('option');
+                    option.value = format.data_format_index;
+                    option.textContent = format.comment;
+                    selectFormatElement.appendChild(option);
+                });
+                await getTableData();
+            } catch (error) {
+                console.error('Error fetching table names:', error);
+            }
+        };
+
+        window.onload = fetchTableNames;
+
+        const getTableData = async () => {
+            try {
+                await connectToDatabase();
+                const selectedData = document.getElementById('data-select').value;
+                const selectedFormatData = document.getElementById('data-format-select');
+                // Check which period is selected
+                const period = document.querySelector('input[name="period"]:checked').value;
+                let queryWhere;
+
+                const today = new Date();
+                
+                // Calculate the timestamp based on the selected period
+                let formattedTimestamp;
+
+                if (period === 'OneDay') {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    formattedTimestamp = Math.floor(yesterday.getTime() / 1000);
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                } else if (period === 'OneWeek') {
+                    const lastWeek = new Date();
+                    lastWeek.setDate(lastWeek.getDate() - 7);
+                    formattedTimestamp = Math.floor(lastWeek.getTime() / 1000);
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                } else if (period === 'OneMonth') {
+                    const lastMonth = new Date();
+                    lastMonth.setMonth(lastMonth.getMonth() - 1);
+                    formattedTimestamp = Math.floor(lastMonth.getTime() / 1000);
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                } else if (period === 'HalfYear') {
+                    const lastHalfYear = new Date();
+                    lastHalfYear.setMonth(lastHalfYear.getMonth() - 6);
+                    formattedTimestamp = Math.floor(lastHalfYear.getTime() / 1000);
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                }
+                else if (period === 'OneYear') {
+                    const lastYear = new Date();
+                    lastYear.setFullYear(lastYear.getFullYear() - 1);
+                    formattedTimestamp = Math.floor(lastYear.getTime() / 1000);
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                }
+                else if (period === 'Custom') {
+                    const periodFrom = document.getElementById('PeriodFrom').value;
+                    const periodTo = document.getElementById('PeriodTo').value;
+
+                    // Create Date objects from the string inputs
+                    const dateFrom = new Date(periodFrom);
+                    const dateTo = new Date(periodTo);
+
+                    // Check if the dates are valid
+                    if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
+                        outputDiv.innerHTML = 'Invalid date range. Please enter valid dates.';
+                        return;
+                    }
+
+                    let formattedTimestampFrom = Math.floor(dateFrom.getTime() / 1000);
+                    let formattedTimestampTo = Math.floor(dateTo.getTime() / 1000);
+
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestampFrom} AND [${selectedData}].time@timestamp <= ${formattedTimestampTo};`;
+                }
+                // let query = `SELECT * FROM [${selectedData}] ` + queryWhere;
+                let query = `SELECT [${selectedData}].data_index, 
+                      [${selectedData}].time@timestamp, 
+                      [${selectedData}].data_format_${selectedFormatData.value} as ${selectedFormatData.options[selectedFormatData.selectedIndex].text}
+                    FROM [${selectedData}] ` + queryWhere;
+                const result = await queryDatabase(query);
+                // // Assume you have a mapping of comments
+                // const commentsMapping = await queryDatabase(`SELECT * from [${selectedData}_format]`);
+                // // Transform the data
+                // const transformedData = result.map(item => {
+                //     const transformedItem = {
+                //         data_index: item.data_index,
+                //         "time@timestamp": item["time@timestamp"]
+                //     };
+
+                //     // Dynamically add data_format fields based on available keys
+                //     for (let i = 0; i < commentsMapping.length; i++) {
+                //         const dataFormatKey = `data_format_${i}`;
+                //         if (item[dataFormatKey] !== undefined) {
+                //             transformedItem[commentsMapping[i].comment] = item[dataFormatKey];
+                //         }
+                //     }
+
+                //     return transformedItem;
+                // });
+
+                const createTable = (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
+                    wrapper.style.width = '100%'; // Set width to 100%
+                    wrapper.style.minHeight = 'calc(20 * 24px)'; // Minimum height for 10 rows (assuming 24px per row)
+
+                    const table = document.createElement('table');
+                    table.style.width = '100%'; // Ensure the table takes full width
+                    table.style.borderCollapse = 'collapse'; // Optional: for better styling
+
+                    const header = table.createTHead();
+                    const headerRow = header.insertRow(0);
+                    Object.keys(data[0]).forEach(key => {
+                        const cell = headerRow.insertCell();
+                        cell.innerHTML = `<strong>${key}</strong>`;
+                        cell.style.position = 'sticky'; // Make header sticky
+                        cell.style.top = '0'; // Stick to the top
+                        cell.style.backgroundColor = '#fff'; // Background color for visibility
+                        cell.style.zIndex = '10'; // Ensure header is above other content
+                    });
+
+                    const tbody = table.createTBody();
+                    data.forEach(item => {
+                        const row = tbody.insertRow();
+
+                        Object.entries(item).forEach(([key, value], index) => {
+                            const cell = row.insertCell();
+
+                            // Check if the value is a timestamp (in seconds)
+                            if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) { // Typical timestamp range
+                                // Convert the timestamp to a Date object
+                                const date = new Date(value * 1000); // Convert seconds to milliseconds
+                                
+                                // Format the date and time
+                                const formattedDateTime = date.toLocaleString(); // This gives both date and time
+                                
+                                // Set the cell text to the formatted date and time
+                                cell.textContent = formattedDateTime;
+                            } else {
+                                // For other values, just set the cell text
+                                cell.textContent = value;
+                            }
+                        });
+                    });
+
+                    wrapper.appendChild(table);
+                    return wrapper;
+                };
+
+                if (!result || result.length === 0) {
+                    outputDiv.innerHTML = 'No data found.';
+                } else {
+                    const table = createTable(result);
+                    outputDiv.innerHTML = '';
+                    outputDiv.appendChild(table);
+                    outputDiv.dataset.result = JSON.stringify(result); // Store result for export
+                }
+            } catch (error) {
+                console.error('Error occurred:', error);
+                outputDiv.innerHTML = 'Error: ' + error.message;
+            }
+        };
+
+        const exportToCSV = (data) => {
+            const csvRows = [];
+            const headers = Object.keys(data[0]);
+            csvRows.push(headers.join(','));
+
+            for (const row of data) {
+                const values = headers.map(header => {
+                    const escaped = ('' + row[header]).replace(/"/g, '\\"');
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'data.csv');
+            a.click();
+        };
+
+        const exportToPDF = (data) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const headers = Object.keys(data[0]);
+            const rows = data.map(item => headers.map(header => item[header]));
+
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+            });
+
+            doc.save('data.pdf');
+        };
+
+        document.getElementById('export-pdf').addEventListener('click', () => {
+            const data = JSON.parse(outputDiv.dataset.result);
+            exportToPDF(data);
+        });
+
+        document.getElementById('export-csv').addEventListener('click', () => {
+            const data = JSON.parse(outputDiv.dataset.result);
+            exportToCSV(data);
+        });
+
+        // document.getElementById('btn__get-graph').addEventListener('click', function() {
+        //     const periodFrom = document.getElementById('PeriodFrom').value;
+        //     const periodTo = document.getElementById('PeriodTo').value;
+        //     const selectedPeriod = document.querySelector('input[name="period"]:checked').value;
+
+        //     // Display the selected values in the output div
+        //     const outputDiv = document.getElementById('output');
+        //     outputDiv.innerHTML = `
+        //         <h2>Selected Period</h2>
+        //         <p>From: ${periodFrom}</p>
+        //         <p>To: ${periodTo}</p>
+        //         <p>Period Type: ${selectedPeriod}</p>
+        //     `;
+        // });
+
+        // Get all radio buttons and the period-from-to section
+        const radioButtons = document.querySelectorAll('input[name="period"]');
+        const periodFromTo = document.getElementById('period-from-to');
+
+        // Add event listener to each radio button
+        radioButtons.forEach(radio => {
+            radio.addEventListener('change', async function() {
+                // Show the period-from-to section if Custom is selected, otherwise hide it
+                if (this.value === 'Custom') {
+                    periodFromTo.style.display = 'table-row'; // Show the row
+                } else {
+                    periodFromTo.style.display = 'none'; // Hide the row
+                }
+
+                await getTableData();
+            });
+        });
+
+    </script>
+</body>
+</html>
