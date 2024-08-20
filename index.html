@@ -474,44 +474,9 @@ console.log(dataPoints);
                                 borderWidth: 1,
                                 spanGaps: true,
                                 fill: false,
-                            }]
+                            }],
+                            labels: labels
                         },
-                        options: {
-                            scales: {
-                                x: {
-                                    type: 'linear',
-                                    position: 'bottom',
-                                    title: {
-                                        display: true,
-                                        text: period === "OneDay" ? 'Hour of the Day' : 'Day and Time'
-                                    },
-                                    ticks: {
-                                        autoSkip: false,
-                                        maxTicksLimit: period === "OneDay" ? 24 : 28,
-                                        callback: function(value) {
-                                            return labels[Math.floor(value)] || '';
-                                        }
-                                    }
-                                },
-                                y: {
-                                    title: {
-                                        display: true,
-                                        text: 'Value'
-                                    },
-                                    beginAtZero: true
-                                }
-                            },
-                            plugins: {
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(tooltipItem) {
-                                            const index = Math.floor(tooltipItem.raw.x);
-                                            return `Value: ${tooltipItem.raw.y} at ${labels[index] || 'N/A'}`;
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     });
 
                     return wrapper;
