@@ -57,6 +57,7 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>Richmond System</h1>
@@ -110,8 +111,9 @@
     </table>    
 
     <div id="output"></div>
-    
+    <div id="chart-container"></div>
     <script>
+       
         const { connectToDatabase, queryDatabase } = require('./db');
         // Declare outputDiv at the top
         const outputDiv = document.getElementById('output');
@@ -169,7 +171,6 @@
         };
 
         window.onload = fetchTableNames;
-
         const getTableData = async () => {
             try {
                 await connectToDatabase();
@@ -233,7 +234,7 @@
                 // let query = `SELECT * FROM [${selectedData}] ` + queryWhere;
                 let query = `SELECT [${selectedData}].data_index, 
                       [${selectedData}].time@timestamp, 
-                      [${selectedData}].data_format_${selectedFormatData.value} as ${selectedFormatData.options[selectedFormatData.selectedIndex].text}
+                      [${selectedData}].data_format_${selectedFormatData.value} as data_format_${selectedFormatData.value}
                     FROM [${selectedData}] ` + queryWhere;
                 const result = await queryDatabase(query);
                 // // Assume you have a mapping of comments
@@ -257,60 +258,274 @@
                 // });
 
                 const createTable = (data) => {
+                    const defaultEntriesPerPage = 10
+                    let currentPage = 1;
+                    let entriesPerPage = defaultEntriesPerPage;
+                    let totalPages = Math.ceil(data.length / entriesPerPage);
+
+                    const wrapper = document.createElement('div');
+                    wrapper.style.width = '100%';
+
+                    // Top control panel (entries per page select)
+                    const topControlPanel = document.createElement('div');
+                    topControlPanel.style.display = 'flex';
+                    topControlPanel.style.justifyContent = 'flex-start';
+                    topControlPanel.style.marginBottom = '10px';
+
+                    const entriesSelectLabel = document.createElement('label');
+                    entriesSelectLabel.textContent = 'Entries per page: ';
+                    entriesSelectLabel.style.marginRight = '5px';
+
+                    const entriesSelect = document.createElement('select');
+                    [5, 10, 20, 50].forEach(size => {
+                        const option = document.createElement('option');
+                        option.value = size;
+                        option.textContent = `${size}`;
+                        if (size === entriesPerPage) option.selected = true;
+                        entriesSelect.appendChild(option);
+                    });
+
+                    entriesSelect.onchange = (event) => {
+                        entriesPerPage = parseInt(event.target.value);
+                        totalPages = Math.ceil(data.length / entriesPerPage);
+                        currentPage = 1; // Reset to the first page
+                        updateTable();
+                    };
+
+                    topControlPanel.appendChild(entriesSelectLabel);
+                    topControlPanel.appendChild(entriesSelect);
+                    wrapper.appendChild(topControlPanel);
+
+                    const tableContainer = document.createElement('div');
+                    tableContainer.style.overflowX = 'auto';
+                    tableContainer.style.width = '100%';
+                    wrapper.appendChild(tableContainer);
+
+                    const table = document.createElement('table');
+                    table.style.width = '100%';
+                    table.style.borderCollapse = 'collapse';
+                    tableContainer.appendChild(table);
+
+                    const renderTable = () => {
+                        table.innerHTML = '';
+
+                        const header = table.createTHead();
+                        const headerRow = header.insertRow(0);
+                        Object.keys(data[0]).forEach(key => {
+                            const cell = headerRow.insertCell();
+                            cell.innerHTML = `<strong>${key}</strong>`;
+                            cell.style.position = 'sticky';
+                            cell.style.top = '0';
+                            cell.style.backgroundColor = '#fff';
+                            cell.style.zIndex = '10';
+                        });
+
+                        const tbody = table.createTBody();
+                        const start = (currentPage - 1) * entriesPerPage;
+                        const end = Math.min(start + entriesPerPage, data.length);
+                        const currentData = data.slice(start, end);
+
+                        currentData.forEach(item => {
+                            const row = tbody.insertRow();
+
+                            Object.entries(item).forEach(([key, value], index) => {
+                                const cell = row.insertCell();
+
+                                if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
+                                    const date = new Date(value * 1000);
+                                    const formattedDateTime = date.toLocaleString();
+                                    cell.textContent = formattedDateTime;
+                                } else {
+                                    cell.textContent = value;
+                                }
+                            });
+                        });
+                    };
+
+                    const renderPagination = () => {
+                        const existingPagination = wrapper.querySelector('.pagination-line');
+                        if (existingPagination) {
+                            existingPagination.remove();
+                        }
+
+                        const paginationLine = document.createElement('div');
+                        paginationLine.className = 'pagination-line';
+                        paginationLine.style.display="flex";
+                        paginationLine.style.justifyContent="space-between";
+                        paginationLine.style.marginTop="10px";
+
+                        const pageInfo = document.createElement('span');
+                        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+                        pageInfo.style.display = 'flex';
+                        pageInfo.style.lineHeight = '4';
+                        
+                        const pagination = document.createElement('div');
+                        pagination.className = 'pagination';
+                        pagination.style.display = 'flex';
+
+                        const prevButton = document.createElement('button');
+                        prevButton.textContent = 'Previous';
+                        prevButton.disabled = currentPage === 1;
+                        prevButton.onclick = () => {
+                            if (currentPage > 1) {
+                                currentPage--;
+                                updateTable();
+                            }
+                        };
+
+                        const nextButton = document.createElement('button');
+                        nextButton.textContent = 'Next';
+                        nextButton.disabled = currentPage === totalPages;
+                        nextButton.onclick = () => {
+                            if (currentPage < totalPages) {
+                                currentPage++;
+                                updateTable();
+                            }
+                        };
+
+                        pagination.appendChild(prevButton);
+                        pagination.appendChild(nextButton);
+                        
+                        paginationLine.appendChild(pageInfo);
+                        paginationLine.appendChild(pagination);
+
+                        wrapper.appendChild(paginationLine);
+                    };
+
+                    const updateTable = () => {
+                        renderTable();
+                        renderPagination();
+                    };
+
+                    updateTable();
+
+                    return wrapper;
+                };
+
+                const createGraph = (data) => {
                     const wrapper = document.createElement('div');
                     wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
                     wrapper.style.width = '100%'; // Set width to 100%
-                    wrapper.style.minHeight = 'calc(20 * 24px)'; // Minimum height for 10 rows (assuming 24px per row)
 
-                    const table = document.createElement('table');
-                    table.style.width = '100%'; // Ensure the table takes full width
-                    table.style.borderCollapse = 'collapse'; // Optional: for better styling
+                    const labels = [];
+                    const dataPoints = [];
+                    const now = new Date();
 
-                    const header = table.createTHead();
-                    const headerRow = header.insertRow(0);
-                    Object.keys(data[0]).forEach(key => {
-                        const cell = headerRow.insertCell();
-                        cell.innerHTML = `<strong>${key}</strong>`;
-                        cell.style.position = 'sticky'; // Make header sticky
-                        cell.style.top = '0'; // Stick to the top
-                        cell.style.backgroundColor = '#fff'; // Background color for visibility
-                        cell.style.zIndex = '10'; // Ensure header is above other content
-                    });
+                    if (period === "OneDay") {
+                        // Get the start of the day (midnight)
+                        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 4, 0, 0, 0, 0);
 
-                    const tbody = table.createTBody();
-                    data.forEach(item => {
-                        const row = tbody.insertRow();
+                        // Generate labels for each hour of the day
+                        for (let i = 0; i < 24; i++) {
+                            const hourTime = new Date(startOfDay.getTime() + i * 60 * 60 * 1000);
+                            const hours = hourTime.getHours();
+                            const periodLabel = hours < 12 ? 'AM' : 'PM';
+                            const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
+                            const label = `${hourTime.getMonth() + 1}/${hourTime.getDate()} ${formattedTime}`;
+                            labels.push(label);
+                        }
 
-                        Object.entries(item).forEach(([key, value], index) => {
-                            const cell = row.insertCell();
-
-                            // Check if the value is a timestamp (in seconds)
-                            if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) { // Typical timestamp range
-                                // Convert the timestamp to a Date object
-                                const date = new Date(value * 1000); // Convert seconds to milliseconds
-                                
-                                // Format the date and time
-                                const formattedDateTime = date.toLocaleString(); // This gives both date and time
-                                
-                                // Set the cell text to the formatted date and time
-                                cell.textContent = formattedDateTime;
-                            } else {
-                                // For other values, just set the cell text
-                                cell.textContent = value;
-                            }
+                        // Generate data points based on the hour intervals
+                        data.forEach(item => {
+                            const time = new Date(item['time@timestamp'] * 1000);
+                            const timeDifference = time.getTime() - startOfDay.getTime();
+                            const exactPosition = timeDifference / (60 * 60 * 1000); // Convert time difference to hours
+                            const value = parseFloat(item[Object.keys(item)[2]]);
+                            dataPoints.push({ x: exactPosition, y: value });
                         });
+                    } else if (period === "OneWeek") {
+                        // Get the start of the week (Sunday)
+                        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay(), 0, 0, 0, 0);
+
+                        // Generate labels for each 6-hour interval over the week
+                        for (let i = 0; i < 28; i++) {
+                            const intervalTime = new Date(startOfWeek.getTime() + i * 6 * 60 * 60 * 1000);
+                            const hours = intervalTime.getHours();
+                            const periodLabel = hours < 12 ? 'AM' : 'PM';
+                            const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
+                            const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
+                            labels.push(label);
+                        }
+
+                        // Generate data points based on the 6-hour intervals
+                        data.forEach(item => {
+                            const time = new Date(item['time@timestamp'] * 1000);
+                            const timeDifference = time.getTime() - startOfWeek.getTime();
+                            const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
+                            const value = parseFloat(item[Object.keys(item)[2]]);
+                            dataPoints.push({ x: exactPosition, y: value });
+                        });
+                    }
+
+                    // Create the canvas element for the chart
+                    const canvas = document.createElement('canvas');
+                    wrapper.appendChild(canvas);
+console.log(labels);
+console.log(dataPoints);
+                    const ctx = canvas.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            datasets: [{
+                                label: 'Data Values',
+                                data: dataPoints,
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1,
+                                spanGaps: true,
+                                fill: false,
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                x: {
+                                    type: 'linear',
+                                    position: 'bottom',
+                                    title: {
+                                        display: true,
+                                        text: period === "OneDay" ? 'Hour of the Day' : 'Day and Time'
+                                    },
+                                    ticks: {
+                                        autoSkip: false,
+                                        maxTicksLimit: period === "OneDay" ? 24 : 28,
+                                        callback: function(value) {
+                                            return labels[Math.floor(value)] || '';
+                                        }
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Value'
+                                    },
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(tooltipItem) {
+                                            const index = Math.floor(tooltipItem.raw.x);
+                                            return `Value: ${tooltipItem.raw.y} at ${labels[index] || 'N/A'}`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     });
 
-                    wrapper.appendChild(table);
                     return wrapper;
                 };
 
                 if (!result || result.length === 0) {
                     outputDiv.innerHTML = 'No data found.';
                 } else {
+                    console.log(result);
                     const table = createTable(result);
+                    const graph = createGraph(result);
                     outputDiv.innerHTML = '';
                     outputDiv.appendChild(table);
+                    outputDiv.appendChild(graph);
                     outputDiv.dataset.result = JSON.stringify(result); // Store result for export
                 }
             } catch (error) {
@@ -380,7 +595,7 @@
                 }
                 return row;
             });
-
+console.log(data);
             exportToCSV(data);
         });
 
