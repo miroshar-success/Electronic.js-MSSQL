@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
+    "chart.js": "^4.4.3",
     "chartjs-adapter-date-fns": "^3.0.0",
     "electron-forge": "^5.2.4",
     "mssql": "^11.0.1"
