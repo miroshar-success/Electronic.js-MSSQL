@@ -460,25 +460,91 @@
                     // Create the canvas element for the chart
                     const canvas = document.createElement('canvas');
                     wrapper.appendChild(canvas);
-console.log(labels);
-console.log(dataPoints);
+
+                    // Sorting dataPoints data
+                    const sortedDataPoints = dataPoints.sort((a, b) => {
+                        if (a.x === b.x) {
+                            return a.y - b.y; // If x values are the same, sort by y value
+                        } else {
+                            return a.x - b.x; // Otherwise, sort by x value
+                        }
+                    });
+                    function calculateTimeFromX(x) {
+                        // Extract hours
+                        const hours = Math.floor(x);
+
+                        // Extract minutes
+                        const minutesDecimal = (x - hours) * 60;
+                        const minutes = Math.floor(minutesDecimal);
+
+                        // Extract seconds
+                        const secondsDecimal = (minutesDecimal - minutes) * 60;
+                        const seconds = Math.floor(secondsDecimal);
+
+                        // Determine AM/PM
+                        const period = hours < 12 ? 'AM' : 'PM';
+
+                        // Convert to 12-hour format
+                        const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+
+                        // Pad minutes and seconds with leading zeros if necessary
+                        const paddedMinutes = String(minutes).padStart(2, '0');
+                        const paddedSeconds = String(seconds).padStart(2, '0');
+
+                        // Format the time string
+                        const timeString = `${formattedHours}:${paddedMinutes}:${paddedSeconds} ${period}`;
+                        return timeString;
+                    }
                     const ctx = canvas.getContext('2d');
-                    new Chart(ctx, {
+                    const myChart = new Chart(ctx, {
                         type: 'line',
                         data: {
                             datasets: [{
-                                label: 'Data Values',
-                                data: dataPoints,
-                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                borderColor: 'rgba(75, 192, 192, 1)',
-                                borderWidth: 1,
-                                spanGaps: true,
-                                fill: false,
-                            }],
-                            labels: labels
+                            label: 'Data Values',
+                            data: sortedDataPoints,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            spanGaps: true,
+                            fill: false,
+                            }]
                         },
-                    });
-
+                        options: {
+                            scales: {
+                            x: {
+                                type: 'linear',  // Set the x-axis to be a linear scale
+                                position: 'bottom',
+                                title: {
+                                display: true,
+                                text: 'Time (custom x-value)'
+                                },
+                                ticks: {
+                                callback: function(value, index, values) {
+                                    const labelIndex = Math.round(value);  // Assuming your x values align with the index
+                                    return labels[labelIndex] || '';       // Return corresponding label or empty string
+                                },
+                                stepSize: 1, // Set step size to 1 to match your data points
+                                }
+                            },
+                            y: {
+                                title: {
+                                display: true,
+                                text: 'Value'
+                                },
+                                beginAtZero: true
+                            }
+                            },
+                            plugins: {
+                            tooltip: {
+                                callbacks: {
+                                label: function(tooltipItem) {
+                                    return `time@timestamp:` + calculateTimeFromX(tooltipItem.parsed.x) + `, data_format_index: ${tooltipItem.parsed.y}`;
+                                }
+                                }
+                            }
+                            }
+                        }
+                        });
                     return wrapper;
                 };
 
