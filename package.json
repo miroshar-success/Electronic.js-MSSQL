@@ -1,22 +1,55 @@
 {
-  "name": "my-electron-sql-app",
+  "name": "Richmond",
   "description": "Richmond System",
   "author": "Oskar Mast",
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron-forge start",
     "build": "electron-builder",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "package": "electron-forge package"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "electron_quick_start"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
+      ]
+    }
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/maker-deb": "^7.4.0",
+    "@electron-forge/maker-rpm": "^7.4.0",
+    "@electron-forge/maker-squirrel": "^7.4.0",
+    "@electron-forge/maker-zip": "^7.4.0",
     "electron": "^31.4.0",
-    "electron-builder": "^24.13.3",
+    "electron-prebuilt-compile": "^8.2.0",
     "mysql2": "latest"
   },
   "build": {
     "appId": "com.example.electronapp",
-    "productName": "MyElectronApp",
+    "productName": "Richmond",
     "files": [
       "main.js",
       "index.html",
@@ -36,7 +69,6 @@
     "7zip-bin": "^5.2.0",
     "chart.js": "^4.4.3",
     "chartjs-adapter-date-fns": "^3.0.0",
-    "electron-forge": "^5.2.4",
     "mssql": "^11.0.1"
   }
 }
