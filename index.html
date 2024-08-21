@@ -47,6 +47,39 @@
             margin: 10px 10px; /* Space between buttons */
             cursor: pointer; /* Change cursor on hover */
         }
+        /* Add this CSS to your stylesheet */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .spinner {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 120px;
+            height: 120px;
+            -webkit-animation: spin 2s linear infinite;
+            animation: spin 2s linear infinite;
+        }
+
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
     </style>
     <style>
@@ -60,6 +93,12 @@
     <script src="assets/js/Chart.js-master/chart.js"></script>
 </head>
 <body>
+    <!-- Add this HTML to your page -->
+    <div id="loading-screen" style="display: flex;">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
     <h1>Richmond System</h1>
     
     <label for="data-select">Select Data Source:</label>
@@ -113,595 +152,576 @@
     <div id="output"></div>
     <div id="chart-container"></div>
     <script>
-       
-        const { connectToDatabase, queryDatabase } = require('./db');
-        // Declare outputDiv at the top
-        const outputDiv = document.getElementById('output');
-        const fetchTableNames = async () => {
-            try {
-                await connectToDatabase();
-                const tables = await queryDatabase("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';");
-                const selectElement = document.getElementById('data-select');
-                const filteredTables = tables.filter(table => table.TABLE_NAME.endsWith('_data'));
+      
+            document.getElementById('loading-screen').style.display = 'flex';
+            const { connectToDatabase, queryDatabase } = require('./db');
+            // Declare outputDiv at the top
+            const outputDiv = document.getElementById('output');
+            const fetchTableNames = async () => {
+                try {
+                    await connectToDatabase();
+                    const tables = await queryDatabase("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';");
+                    const selectElement = document.getElementById('data-select');
+                    const filteredTables = tables.filter(table => table.TABLE_NAME.endsWith('_data'));
 
-                // Populate the select element with filtered table names
-                filteredTables.forEach(table => {
-                    const option = document.createElement('option');
-                    option.value = table.TABLE_NAME;
-                    option.textContent = table.TABLE_NAME;
-                    selectElement.appendChild(option);
-                });
-
-                selectElement.innerHTML = '';
-                filteredTables.forEach(table => {
-                    const tableName = table.TABLE_NAME.replace(/^cMT-4429_/, '').replace(/_data$/, '');
-                    const option = document.createElement('option');
-                    option.value = table.TABLE_NAME;
-                    option.textContent = tableName;
-                    selectElement.appendChild(option);
-                });
-
-                await fetchTableFormats();
-
-            } catch (error) {
-                console.error('Error fetching table names:', error);
-            }
-        };
-
-        const fetchTableFormats = async () => {
-            try {
-                await connectToDatabase();
-                const selectFormatElement = document.getElementById('data-format-select');
-                selectFormatElement.innerHTML = '';
-
-                const selectElement = document.getElementById('data-select');
-                const selectedData = selectElement.value;
-
-                const dataFormatIndexs = await queryDatabase(`SELECT * FROM [${selectedData}_format];`);
-                dataFormatIndexs.forEach(format => {
-                    const option = document.createElement('option');
-                    option.value = format.data_format_index;
-                    option.textContent = format.comment;
-                    selectFormatElement.appendChild(option);
-                });
-                await getTableData();
-            } catch (error) {
-                console.error('Error fetching table names:', error);
-            }
-        };
-
-        window.onload = fetchTableNames;
-        const getTableData = async () => {
-            try {
-                await connectToDatabase();
-                const selectedData = document.getElementById('data-select').value;
-                const selectedFormatData = document.getElementById('data-format-select');
-                // Check which period is selected
-                const period = document.querySelector('input[name="period"]:checked').value;
-                let queryWhere;
-
-                const today = new Date();
-                
-                // Calculate the timestamp based on the selected period
-                let formattedTimestamp;
-
-                // if (period === 'OneDay') {
-                //     const yesterday = new Date();
-                //     yesterday.setDate(yesterday.getDate() - 1);
-                //     formattedTimestamp = Math.floor(yesterday.getTime() / 1000);
-                //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
-                // } else if (period === 'OneWeek') {
-                //     const lastWeek = new Date();
-                //     lastWeek.setDate(lastWeek.getDate() - 7);
-                //     formattedTimestamp = Math.floor(lastWeek.getTime() / 1000);
-                //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
-                // }
-
-                if (period === 'OneDay') {
-                    const now = new Date();
-                    const currentTimestamp = Math.floor(now.getTime() / 1000); // Current timestamp in seconds
-
-                    let twentyFourHoursAgo = new Date();
-                    twentyFourHoursAgo.setDate(twentyFourHoursAgo.getDate() - 1); // 24 hours ago
-                    formattedTimestamp = Math.floor(twentyFourHoursAgo.getTime() / 1000); // Timestamp for 24 hours ago
-
-                    // Update the query to include the range from 24 hours ago to now
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp} AND [${selectedData}].time@timestamp <= ${currentTimestamp};`;
-
-                } else if (period === 'OneWeek') {
-                    const now = new Date(); // Current time
-                    let startOfPeriod = new Date();
-                    startOfPeriod.setDate(startOfPeriod.getDate() - 7); // 7 days ago
-
-                    // Convert to Unix timestamps (seconds since epoch)
-                    let startTimestamp = Math.floor(startOfPeriod.getTime() / 1000);
-                    let endTimestamp = Math.floor(now.getTime() / 1000); // Current time
-
-                    // Update the query to include the range
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${startTimestamp} AND [${selectedData}].time@timestamp <= ${endTimestamp};`;
-
-                } else if (period === 'OneMonth') {
-                    const lastMonth = new Date();
-                    lastMonth.setMonth(lastMonth.getMonth() - 1);
-                    formattedTimestamp = Math.floor(lastMonth.getTime() / 1000);
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
-                } else if (period === 'HalfYear') {
-                    const lastHalfYear = new Date();
-                    lastHalfYear.setMonth(lastHalfYear.getMonth() - 6);
-                    formattedTimestamp = Math.floor(lastHalfYear.getTime() / 1000);
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
-                }
-                else if (period === 'OneYear') {
-                    const lastYear = new Date();
-                    lastYear.setFullYear(lastYear.getFullYear() - 1);
-                    formattedTimestamp = Math.floor(lastYear.getTime() / 1000);
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
-                }
-                else if (period === 'Custom') {
-                    const periodFrom = document.getElementById('PeriodFrom').value;
-                    const periodTo = document.getElementById('PeriodTo').value;
-
-                    // Create Date objects from the string inputs
-                    const dateFrom = new Date(periodFrom);
-                    const dateTo = new Date(periodTo);
-
-                    // Check if the dates are valid
-                    if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
-                        outputDiv.innerHTML = 'Invalid date range. Please enter valid dates.';
-                        return;
-                    }
-
-                    let formattedTimestampFrom = Math.floor(dateFrom.getTime() / 1000);
-                    let formattedTimestampTo = Math.floor(dateTo.getTime() / 1000);
-
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestampFrom} AND [${selectedData}].time@timestamp <= ${formattedTimestampTo};`;
-                }
-                // let query = `SELECT * FROM [${selectedData}] ` + queryWhere;
-                let query = `SELECT [${selectedData}].data_index, 
-                      [${selectedData}].time@timestamp, 
-                      [${selectedData}].data_format_${selectedFormatData.value} as data_format_${selectedFormatData.value}
-                    FROM [${selectedData}] ` + queryWhere;
-                const result = await queryDatabase(query);
-                // // Assume you have a mapping of comments
-                // const commentsMapping = await queryDatabase(`SELECT * from [${selectedData}_format]`);
-                // // Transform the data
-                // const transformedData = result.map(item => {
-                //     const transformedItem = {
-                //         data_index: item.data_index,
-                //         "time@timestamp": item["time@timestamp"]
-                //     };
-
-                //     // Dynamically add data_format fields based on available keys
-                //     for (let i = 0; i < commentsMapping.length; i++) {
-                //         const dataFormatKey = `data_format_${i}`;
-                //         if (item[dataFormatKey] !== undefined) {
-                //             transformedItem[commentsMapping[i].comment] = item[dataFormatKey];
-                //         }
-                //     }
-
-                //     return transformedItem;
-                // });
-
-                const createTable = (data) => {
-                    const defaultEntriesPerPage = 10
-                    let currentPage = 1;
-                    let entriesPerPage = defaultEntriesPerPage;
-                    let totalPages = Math.ceil(data.length / entriesPerPage);
-
-                    const wrapper = document.createElement('div');
-                    wrapper.style.width = '100%';
-
-                    // Top control panel (entries per page select)
-                    const topControlPanel = document.createElement('div');
-                    topControlPanel.style.display = 'flex';
-                    topControlPanel.style.justifyContent = 'flex-start';
-                    topControlPanel.style.marginBottom = '10px';
-
-                    const entriesSelectLabel = document.createElement('label');
-                    entriesSelectLabel.textContent = 'Entries per page: ';
-                    entriesSelectLabel.style.marginRight = '5px';
-
-                    const entriesSelect = document.createElement('select');
-                    [5, 10, 20, 50].forEach(size => {
+                    // Populate the select element with filtered table names
+                    filteredTables.forEach(table => {
                         const option = document.createElement('option');
-                        option.value = size;
-                        option.textContent = `${size}`;
-                        if (size === entriesPerPage) option.selected = true;
-                        entriesSelect.appendChild(option);
+                        option.value = table.TABLE_NAME;
+                        option.textContent = table.TABLE_NAME;
+                        selectElement.appendChild(option);
                     });
 
-                    entriesSelect.onchange = (event) => {
-                        entriesPerPage = parseInt(event.target.value);
-                        totalPages = Math.ceil(data.length / entriesPerPage);
-                        currentPage = 1; // Reset to the first page
-                        updateTable();
-                    };
+                    selectElement.innerHTML = '';
+                    filteredTables.forEach(table => {
+                        const tableName = table.TABLE_NAME.replace(/^cMT-4429_/, '').replace(/_data$/, '');
+                        const option = document.createElement('option');
+                        option.value = table.TABLE_NAME;
+                        option.textContent = tableName;
+                        selectElement.appendChild(option);
+                    });
 
-                    topControlPanel.appendChild(entriesSelectLabel);
-                    topControlPanel.appendChild(entriesSelect);
-                    wrapper.appendChild(topControlPanel);
+                    await fetchTableFormats();
 
-                    const tableContainer = document.createElement('div');
-                    tableContainer.style.overflowX = 'auto';
-                    tableContainer.style.width = '100%';
-                    wrapper.appendChild(tableContainer);
+                } catch (error) {
+                    console.error('Error fetching table names:', error);
+                }
+            };
 
-                    const table = document.createElement('table');
-                    table.style.width = '100%';
-                    table.style.borderCollapse = 'collapse';
-                    tableContainer.appendChild(table);
+            const fetchTableFormats = async () => {
+                try {
+                    await connectToDatabase();
+                    const selectFormatElement = document.getElementById('data-format-select');
+                    selectFormatElement.innerHTML = '';
 
-                    const renderTable = () => {
-                        table.innerHTML = '';
+                    const selectElement = document.getElementById('data-select');
+                    const selectedData = selectElement.value;
 
-                        const header = table.createTHead();
-                        const headerRow = header.insertRow(0);
-                        Object.keys(data[0]).forEach(key => {
-                            const cell = headerRow.insertCell();
-                            cell.innerHTML = `<strong>${key}</strong>`;
-                            cell.style.position = 'sticky';
-                            cell.style.top = '0';
-                            cell.style.backgroundColor = '#fff';
-                            cell.style.zIndex = '10';
+                    const dataFormatIndexs = await queryDatabase(`SELECT * FROM [${selectedData}_format];`);
+                    dataFormatIndexs.forEach(format => {
+                        const option = document.createElement('option');
+                        option.value = format.data_format_index;
+                        option.textContent = format.comment;
+                        selectFormatElement.appendChild(option);
+                    });
+                    await getTableData();
+                } catch (error) {
+                    console.error('Error fetching table names:', error);
+                }
+            };
+
+            window.onload = fetchTableNames;
+            
+            const getTableData = async () => {
+                try {
+                    await connectToDatabase();
+                    const selectedData = document.getElementById('data-select').value;
+                    const selectedFormatData = document.getElementById('data-format-select');
+                    // Check which period is selected
+                    const period = document.querySelector('input[name="period"]:checked').value;
+                    let queryWhere;
+
+                    const today = new Date();
+                    
+                    // Calculate the timestamp based on the selected period
+                    let formattedTimestamp;
+
+                    // if (period === 'OneDay') {
+                    //     const yesterday = new Date();
+                    //     yesterday.setDate(yesterday.getDate() - 1);
+                    //     formattedTimestamp = Math.floor(yesterday.getTime() / 1000);
+                    //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    // } else if (period === 'OneWeek') {
+                    //     const lastWeek = new Date();
+                    //     lastWeek.setDate(lastWeek.getDate() - 7);
+                    //     formattedTimestamp = Math.floor(lastWeek.getTime() / 1000);
+                    //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    // }
+
+                    if (period === 'OneDay') {
+                        const now = new Date();
+                        const currentTimestamp = Math.floor(now.getTime() / 1000); // Current timestamp in seconds
+
+                        let twentyFourHoursAgo = new Date();
+                        twentyFourHoursAgo.setDate(twentyFourHoursAgo.getDate() - 1); // 24 hours ago
+                        formattedTimestamp = Math.floor(twentyFourHoursAgo.getTime() / 1000); // Timestamp for 24 hours ago
+
+                        // Update the query to include the range from 24 hours ago to now
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp} AND [${selectedData}].time@timestamp <= ${currentTimestamp};`;
+
+                    } else if (period === 'OneWeek') {
+                        const now = new Date(); // Current time
+                        let startOfPeriod = new Date();
+                        startOfPeriod.setDate(startOfPeriod.getDate() - 7); // 7 days ago
+
+                        // Convert to Unix timestamps (seconds since epoch)
+                        let startTimestamp = Math.floor(startOfPeriod.getTime() / 1000);
+                        let endTimestamp = Math.floor(now.getTime() / 1000); // Current time
+
+                        // Update the query to include the range
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${startTimestamp} AND [${selectedData}].time@timestamp <= ${endTimestamp};`;
+
+                    } else if (period === 'OneMonth') {
+                        const lastMonth = new Date();
+                        lastMonth.setMonth(lastMonth.getMonth() - 1);
+                        formattedTimestamp = Math.floor(lastMonth.getTime() / 1000);
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    } else if (period === 'HalfYear') {
+                        const lastHalfYear = new Date();
+                        lastHalfYear.setMonth(lastHalfYear.getMonth() - 6);
+                        formattedTimestamp = Math.floor(lastHalfYear.getTime() / 1000);
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    }
+                    else if (period === 'OneYear') {
+                        const lastYear = new Date();
+                        lastYear.setFullYear(lastYear.getFullYear() - 1);
+                        formattedTimestamp = Math.floor(lastYear.getTime() / 1000);
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    }
+                    else if (period === 'Custom') {
+                        const periodFrom = document.getElementById('PeriodFrom').value;
+                        const periodTo = document.getElementById('PeriodTo').value;
+
+                        // Create Date objects from the string inputs
+                        const dateFrom = new Date(periodFrom);
+                        const dateTo = new Date(periodTo);
+
+                        // Check if the dates are valid
+                        if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
+                            outputDiv.innerHTML = 'Invalid date range. Please enter valid dates.';
+                            return;
+                        }
+
+                        let formattedTimestampFrom = Math.floor(dateFrom.getTime() / 1000);
+                        let formattedTimestampTo = Math.floor(dateTo.getTime() / 1000);
+
+                        queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestampFrom} AND [${selectedData}].time@timestamp <= ${formattedTimestampTo};`;
+                    }
+                    // let query = `SELECT * FROM [${selectedData}] ` + queryWhere;
+                    let query = `SELECT [${selectedData}].data_index, 
+                        [${selectedData}].time@timestamp, 
+                        [${selectedData}].data_format_${selectedFormatData.value} as data_format_${selectedFormatData.value}
+                        FROM [${selectedData}] ` + queryWhere;
+                    const result = await queryDatabase(query);
+                    // // Assume you have a mapping of comments
+                    // const commentsMapping = await queryDatabase(`SELECT * from [${selectedData}_format]`);
+                    // // Transform the data
+                    // const transformedData = result.map(item => {
+                    //     const transformedItem = {
+                    //         data_index: item.data_index,
+                    //         "time@timestamp": item["time@timestamp"]
+                    //     };
+
+                    //     // Dynamically add data_format fields based on available keys
+                    //     for (let i = 0; i < commentsMapping.length; i++) {
+                    //         const dataFormatKey = `data_format_${i}`;
+                    //         if (item[dataFormatKey] !== undefined) {
+                    //             transformedItem[commentsMapping[i].comment] = item[dataFormatKey];
+                    //         }
+                    //     }
+
+                    //     return transformedItem;
+                    // });
+
+                    const createTable = (data) => {
+                        const defaultEntriesPerPage = 10
+                        let currentPage = 1;
+                        let entriesPerPage = defaultEntriesPerPage;
+                        let totalPages = Math.ceil(data.length / entriesPerPage);
+
+                        const wrapper = document.createElement('div');
+                        wrapper.style.width = '100%';
+
+                        // Top control panel (entries per page select)
+                        const topControlPanel = document.createElement('div');
+                        topControlPanel.style.display = 'flex';
+                        topControlPanel.style.justifyContent = 'flex-start';
+                        topControlPanel.style.marginBottom = '10px';
+
+                        const entriesSelectLabel = document.createElement('label');
+                        entriesSelectLabel.textContent = 'Entries per page: ';
+                        entriesSelectLabel.style.marginRight = '5px';
+
+                        const entriesSelect = document.createElement('select');
+                        [5, 10, 20, 50].forEach(size => {
+                            const option = document.createElement('option');
+                            option.value = size;
+                            option.textContent = `${size}`;
+                            if (size === entriesPerPage) option.selected = true;
+                            entriesSelect.appendChild(option);
                         });
 
-                        const tbody = table.createTBody();
-                        const start = (currentPage - 1) * entriesPerPage;
-                        const end = Math.min(start + entriesPerPage, data.length);
-                        const currentData = data.slice(start, end);
+                        entriesSelect.onchange = (event) => {
+                            entriesPerPage = parseInt(event.target.value);
+                            totalPages = Math.ceil(data.length / entriesPerPage);
+                            currentPage = 1; // Reset to the first page
+                            updateTable();
+                        };
 
-                        currentData.forEach(item => {
-                            const row = tbody.insertRow();
+                        topControlPanel.appendChild(entriesSelectLabel);
+                        topControlPanel.appendChild(entriesSelect);
+                        wrapper.appendChild(topControlPanel);
 
-                            Object.entries(item).forEach(([key, value], index) => {
-                                const cell = row.insertCell();
+                        const tableContainer = document.createElement('div');
+                        tableContainer.style.overflowX = 'auto';
+                        tableContainer.style.width = '100%';
+                        wrapper.appendChild(tableContainer);
 
-                                if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
-                                    const date = new Date(value * 1000);
-                                    const formattedDateTime = date.toLocaleString();
-                                    cell.textContent = formattedDateTime;
-                                } else {
-                                    cell.textContent = value;
-                                }
+                        const table = document.createElement('table');
+                        table.style.width = '100%';
+                        table.style.borderCollapse = 'collapse';
+                        tableContainer.appendChild(table);
+
+                        const renderTable = () => {
+                            table.innerHTML = '';
+
+                            const header = table.createTHead();
+                            const headerRow = header.insertRow(0);
+                            Object.keys(data[0]).forEach(key => {
+                                const cell = headerRow.insertCell();
+                                cell.innerHTML = `<strong>${key}</strong>`;
+                                cell.style.position = 'sticky';
+                                cell.style.top = '0';
+                                cell.style.backgroundColor = '#fff';
+                                cell.style.zIndex = '10';
                             });
-                        });
-                    };
 
-                    const renderPagination = () => {
-                        const existingPagination = wrapper.querySelector('.pagination-line');
-                        if (existingPagination) {
-                            existingPagination.remove();
-                        }
+                            const tbody = table.createTBody();
+                            const start = (currentPage - 1) * entriesPerPage;
+                            const end = Math.min(start + entriesPerPage, data.length);
+                            const currentData = data.slice(start, end);
 
-                        const paginationLine = document.createElement('div');
-                        paginationLine.className = 'pagination-line';
-                        paginationLine.style.display="flex";
-                        paginationLine.style.justifyContent="space-between";
-                        paginationLine.style.marginTop="10px";
+                            currentData.forEach(item => {
+                                const row = tbody.insertRow();
 
-                        const pageInfo = document.createElement('span');
-                        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-                        pageInfo.style.display = 'flex';
-                        pageInfo.style.lineHeight = '4';
-                        
-                        const pagination = document.createElement('div');
-                        pagination.className = 'pagination';
-                        pagination.style.display = 'flex';
+                                Object.entries(item).forEach(([key, value], index) => {
+                                    const cell = row.insertCell();
 
-                        const prevButton = document.createElement('button');
-                        prevButton.textContent = 'Previous';
-                        prevButton.disabled = currentPage === 1;
-                        prevButton.onclick = () => {
-                            if (currentPage > 1) {
-                                currentPage--;
-                                updateTable();
-                            }
+                                    if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
+                                        const date = new Date(value * 1000);
+                                        const formattedDateTime = date.toLocaleString();
+                                        cell.textContent = formattedDateTime;
+                                    } else {
+                                        cell.textContent = value;
+                                    }
+                                });
+                            });
                         };
 
-                        const nextButton = document.createElement('button');
-                        nextButton.textContent = 'Next';
-                        nextButton.disabled = currentPage === totalPages;
-                        nextButton.onclick = () => {
-                            if (currentPage < totalPages) {
-                                currentPage++;
-                                updateTable();
+                        const renderPagination = () => {
+                            const existingPagination = wrapper.querySelector('.pagination-line');
+                            if (existingPagination) {
+                                existingPagination.remove();
                             }
+
+                            const paginationLine = document.createElement('div');
+                            paginationLine.className = 'pagination-line';
+                            paginationLine.style.display="flex";
+                            paginationLine.style.justifyContent="space-between";
+                            paginationLine.style.marginTop="10px";
+
+                            const pageInfo = document.createElement('span');
+                            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+                            pageInfo.style.display = 'flex';
+                            pageInfo.style.lineHeight = '4';
+                            
+                            const pagination = document.createElement('div');
+                            pagination.className = 'pagination';
+                            pagination.style.display = 'flex';
+
+                            const prevButton = document.createElement('button');
+                            prevButton.textContent = 'Previous';
+                            prevButton.disabled = currentPage === 1;
+                            prevButton.onclick = () => {
+                                if (currentPage > 1) {
+                                    currentPage--;
+                                    updateTable();
+                                }
+                            };
+
+                            const nextButton = document.createElement('button');
+                            nextButton.textContent = 'Next';
+                            nextButton.disabled = currentPage === totalPages;
+                            nextButton.onclick = () => {
+                                if (currentPage < totalPages) {
+                                    currentPage++;
+                                    updateTable();
+                                }
+                            };
+
+                            pagination.appendChild(prevButton);
+                            pagination.appendChild(nextButton);
+                            
+                            paginationLine.appendChild(pageInfo);
+                            paginationLine.appendChild(pagination);
+
+                            wrapper.appendChild(paginationLine);
                         };
 
-                        pagination.appendChild(prevButton);
-                        pagination.appendChild(nextButton);
-                        
-                        paginationLine.appendChild(pageInfo);
-                        paginationLine.appendChild(pagination);
+                        const updateTable = () => {
+                            renderTable();
+                            renderPagination();
+                        };
 
-                        wrapper.appendChild(paginationLine);
+                        updateTable();
+
+                        return wrapper;
                     };
 
-                    const updateTable = () => {
-                        renderTable();
-                        renderPagination();
+                    const createGraph = (data) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
+                        wrapper.style.width = '100%'; // Set width to 100%
+
+                        const labels = [];
+                        const dataPoints = [];
+                        const now = new Date();
+                        const tempDataPoints = [];
+
+                        if (period === "OneDay") {
+                            const now = new Date();
+
+                            // Calculate the starting point, which is 24 hours ago from the current time
+                            const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+                            // Generate labels for each hour from 24 hours ago to now
+                            for (let i = 0; i < 24; i++) {
+                                const hourTime = new Date(startOfDay.getTime() + i * 60 * 60 * 1000);
+                                const hours = hourTime.getHours();
+                                const periodLabel = hours < 12 ? 'AM' : 'PM';
+                                const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
+                                const label = `${hourTime.getMonth() + 1}/${hourTime.getDate()} ${formattedTime}`;
+                                labels.push(label);
+                            }
+
+                            // Generate data points based on the hour intervals
+                            data.forEach(item => {
+                                const time = new Date(item['time@timestamp'] * 1000);
+                                const timeDifference = time.getTime() - startOfDay.getTime();
+                                const exactPosition = timeDifference / (60 * 60 * 1000); // Convert time difference to hours
+                                const value = parseFloat(item[Object.keys(item)[2]]);
+                                dataPoints.push({ x: exactPosition, y: value });
+                                tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
+                            });
+
+                        } else if (period === "OneWeek") {
+                            const now = new Date();
+
+                            // Calculate the starting point, which is 7 days ago from the current time
+                            const startOfPeriod = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, now.getHours(), 0, 0, 0);
+
+                            // Calculate the number of 6-hour intervals between startOfPeriod and now
+                            const intervalCount = Math.ceil((now.getTime() - startOfPeriod.getTime()) / (6 * 60 * 60 * 1000));
+
+                            // Generate labels for each 6-hour interval from 7 days ago to now
+                            for (let i = 0; i < intervalCount; i++) {
+                                const intervalTime = new Date(startOfPeriod.getTime() + i * 6 * 60 * 60 * 1000);
+                                const hours = intervalTime.getHours();
+                                const periodLabel = hours < 12 ? 'AM' : 'PM';
+                                const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
+                                const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
+                                labels.push(label);
+                            }
+
+                            // Generate data points based on the 6-hour intervals
+                            data.forEach(item => {
+                                const time = new Date(item['time@timestamp'] * 1000);
+                                const timeDifference = time.getTime() - startOfPeriod.getTime();
+                                const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
+                                const value = parseFloat(item[Object.keys(item)[2]]);
+                                dataPoints.push({ x: exactPosition, y: value });
+                                tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
+                            });
+                        }
+
+                        // Create the canvas element for the chart
+                        const canvas = document.createElement('canvas');
+                        wrapper.appendChild(canvas);
+                        // Sorting dataPoints data
+                        const sortedDataPoints = dataPoints.sort((a, b) => {
+                            if (a.x === b.x) {
+                                return a.y - b.y; // If x values are the same, sort by y value
+                            } else {
+                                return a.x - b.x; // Otherwise, sort by x value
+                            }
+                        });
+                        function calculateTimeFromX(x) {
+                            // Extract hours
+                            const hours = Math.floor(x);
+
+                            // Extract minutes
+                            const minutesDecimal = (x - hours) * 60;
+                            const minutes = Math.floor(minutesDecimal);
+
+                            // Extract seconds
+                            const secondsDecimal = (minutesDecimal - minutes) * 60;
+                            const seconds = Math.floor(secondsDecimal);
+
+                            // Determine AM/PM
+                            const period = hours < 12 ? 'AM' : 'PM';
+
+                            // Convert to 12-hour format
+                            const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+
+                            // Pad minutes and seconds with leading zeros if necessary
+                            const paddedMinutes = String(minutes).padStart(2, '0');
+                            const paddedSeconds = String(seconds).padStart(2, '0');
+
+                            // Format the time string
+                            const timeString = `${formattedHours}:${paddedMinutes}:${paddedSeconds} ${period}`;
+                            return timeString;
+                        }
+                        const ctx = canvas.getContext('2d');
+                        const myChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                datasets: [{
+                                label: 'Data Values',
+                                data: sortedDataPoints,
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1,
+                                spanGaps: true,
+                                fill: false,
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                x: {
+                                    type: 'linear',  // Set the x-axis to be a linear scale
+                                    position: 'bottom',
+                                    title: {
+                                    display: true,
+                                    text: 'Time (custom x-value)'
+                                    },
+                                    ticks: {
+                                    callback: function(value, index, values) {
+                                        const labelIndex = Math.round(value);  // Assuming your x values align with the index
+                                        return labels[labelIndex] || '';       // Return corresponding label or empty string
+                                    },
+                                    stepSize: 1, // Set step size to 1 to match your data points
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                    display: true,
+                                    text: 'Value'
+                                    },
+                                    beginAtZero: true
+                                }
+                                },
+                                plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                    label: function(tooltipItem) {
+                                        return `time@timestamp:` + (tempDataPoints.find(point => point.x == tooltipItem.parsed.x) ? tempDataPoints.find(point => point.x == tooltipItem.parsed.x).t : null) + `, data_format_index: ${tooltipItem.parsed.y}`;
+                                    }
+                                    }
+                                }
+                                }
+                            }
+                            });
+                        return wrapper;
                     };
 
-                    updateTable();
-
-                    return wrapper;
-                };
-
-                const createGraph = (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
-                    wrapper.style.width = '100%'; // Set width to 100%
-
-                    const labels = [];
-                    const dataPoints = [];
-                    const now = new Date();
-                    const tempDataPoints = [];
-
-                    if (period === "OneDay") {
-                        const now = new Date();
-
-                        // Calculate the starting point, which is 24 hours ago from the current time
-                        const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-                        // Generate labels for each hour from 24 hours ago to now
-                        for (let i = 0; i < 24; i++) {
-                            const hourTime = new Date(startOfDay.getTime() + i * 60 * 60 * 1000);
-                            const hours = hourTime.getHours();
-                            const periodLabel = hours < 12 ? 'AM' : 'PM';
-                            const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
-                            const label = `${hourTime.getMonth() + 1}/${hourTime.getDate()} ${formattedTime}`;
-                            labels.push(label);
-                        }
-
-                        // Generate data points based on the hour intervals
-                        data.forEach(item => {
-                            const time = new Date(item['time@timestamp'] * 1000);
-                            const timeDifference = time.getTime() - startOfDay.getTime();
-                            const exactPosition = timeDifference / (60 * 60 * 1000); // Convert time difference to hours
-                            const value = parseFloat(item[Object.keys(item)[2]]);
-                            dataPoints.push({ x: exactPosition, y: value });
-                            tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
-                        });
-
-                    } else if (period === "OneWeek") {
-                        const now = new Date();
-
-                        // Calculate the starting point, which is 7 days ago from the current time
-                        const startOfPeriod = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, now.getHours(), 0, 0, 0);
-
-                        // Calculate the number of 6-hour intervals between startOfPeriod and now
-                        const intervalCount = Math.ceil((now.getTime() - startOfPeriod.getTime()) / (6 * 60 * 60 * 1000));
-
-                        // Generate labels for each 6-hour interval from 7 days ago to now
-                        for (let i = 0; i < intervalCount; i++) {
-                            const intervalTime = new Date(startOfPeriod.getTime() + i * 6 * 60 * 60 * 1000);
-                            const hours = intervalTime.getHours();
-                            const periodLabel = hours < 12 ? 'AM' : 'PM';
-                            const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
-                            const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
-                            labels.push(label);
-                        }
-
-                        // Generate data points based on the 6-hour intervals
-                        console.log(data);
-                        data.forEach(item => {
-                            const time = new Date(item['time@timestamp'] * 1000);
-                            const timeDifference = time.getTime() - startOfPeriod.getTime();
-                            const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
-                            const value = parseFloat(item[Object.keys(item)[2]]);
-                            dataPoints.push({ x: exactPosition, y: value });
-                            tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
-                        });
+                    if (!result || result.length === 0) {
+                        outputDiv.innerHTML = 'No data found.';
+                    } else {
+                        const table = createTable(result);
+                        const graph = createGraph(result);
+                        outputDiv.innerHTML = '';
+                        outputDiv.appendChild(table);
+                        outputDiv.appendChild(graph);
+                        outputDiv.dataset.result = JSON.stringify(result); // Store result for export
                     }
+                    document.getElementById('loading-screen').style.display = 'none';
+                } catch (error) {
+                    console.error('Error occurred:', error);
+                    outputDiv.innerHTML = 'Error: ' + error.message;
+                }
+            };
 
-                    // Create the canvas element for the chart
-                    const canvas = document.createElement('canvas');
-                    wrapper.appendChild(canvas);
-                    // Sorting dataPoints data
-                    const sortedDataPoints = dataPoints.sort((a, b) => {
-                        if (a.x === b.x) {
-                            return a.y - b.y; // If x values are the same, sort by y value
-                        } else {
-                            return a.x - b.x; // Otherwise, sort by x value
-                        }
+            const exportToCSV = (data) => {
+                const csvRows = [];
+                const headers = Object.keys(data[0]);
+                csvRows.push(headers.join(','));
+                for (const row of data) {
+                    const values = headers.map(header => {
+                        const escaped = ('' + row[header]).replace(/"/g, '\\"');
+                        return `"${escaped}"`;
                     });
-                    console.log(sortedDataPoints);
-                    console.log(labels);
-                    function calculateTimeFromX(x) {
-                        // Extract hours
-                        const hours = Math.floor(x);
-
-                        // Extract minutes
-                        const minutesDecimal = (x - hours) * 60;
-                        const minutes = Math.floor(minutesDecimal);
-
-                        // Extract seconds
-                        const secondsDecimal = (minutesDecimal - minutes) * 60;
-                        const seconds = Math.floor(secondsDecimal);
-
-                        // Determine AM/PM
-                        const period = hours < 12 ? 'AM' : 'PM';
-
-                        // Convert to 12-hour format
-                        const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
-
-                        // Pad minutes and seconds with leading zeros if necessary
-                        const paddedMinutes = String(minutes).padStart(2, '0');
-                        const paddedSeconds = String(seconds).padStart(2, '0');
-
-                        // Format the time string
-                        const timeString = `${formattedHours}:${paddedMinutes}:${paddedSeconds} ${period}`;
-                        return timeString;
-                    }
-                    const ctx = canvas.getContext('2d');
-                    const myChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            datasets: [{
-                            label: 'Data Values',
-                            data: sortedDataPoints,
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1,
-                            spanGaps: true,
-                            fill: false,
-                            }]
-                        },
-                        options: {
-                            scales: {
-                            x: {
-                                type: 'linear',  // Set the x-axis to be a linear scale
-                                position: 'bottom',
-                                title: {
-                                display: true,
-                                text: 'Time (custom x-value)'
-                                },
-                                ticks: {
-                                callback: function(value, index, values) {
-                                    const labelIndex = Math.round(value);  // Assuming your x values align with the index
-                                    return labels[labelIndex] || '';       // Return corresponding label or empty string
-                                },
-                                stepSize: 1, // Set step size to 1 to match your data points
-                                }
-                            },
-                            y: {
-                                title: {
-                                display: true,
-                                text: 'Value'
-                                },
-                                beginAtZero: true
-                            }
-                            },
-                            plugins: {
-                            tooltip: {
-                                callbacks: {
-                                label: function(tooltipItem) {
-                                    return `time@timestamp:` + (tempDataPoints.find(point => point.x == tooltipItem.parsed.x) ? tempDataPoints.find(point => point.x == tooltipItem.parsed.x).t : null) + `, data_format_index: ${tooltipItem.parsed.y}`;
-                                }
-                                }
-                            }
-                            }
-                        }
-                        });
-                    return wrapper;
-                };
-
-                if (!result || result.length === 0) {
-                    outputDiv.innerHTML = 'No data found.';
-                } else {
-                    console.log(result);
-                    const table = createTable(result);
-                    const graph = createGraph(result);
-                    outputDiv.innerHTML = '';
-                    outputDiv.appendChild(table);
-                    outputDiv.appendChild(graph);
-                    outputDiv.dataset.result = JSON.stringify(result); // Store result for export
+                    csvRows.push(values.join(','));
                 }
-            } catch (error) {
-                console.error('Error occurred:', error);
-                outputDiv.innerHTML = 'Error: ' + error.message;
-            }
-        };
 
-        const exportToCSV = (data) => {
-            const csvRows = [];
-            const headers = Object.keys(data[0]);
-            csvRows.push(headers.join(','));
-            for (const row of data) {
-                const values = headers.map(header => {
-                    const escaped = ('' + row[header]).replace(/"/g, '\\"');
-                    return `"${escaped}"`;
+                const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('href', url);
+                a.setAttribute('download', 'data.csv');
+                a.click();
+            };
+
+            const exportToPDF = (data) => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                const headers = Object.keys(data[0]);
+                const rows = data.map(item => headers.map(header => item[header]));
+
+                doc.autoTable({
+                    head: [headers],
+                    body: rows,
                 });
-                csvRows.push(values.join(','));
-            }
 
-            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('href', url);
-            a.setAttribute('download', 'data.csv');
-            a.click();
-        };
+                doc.save('data.pdf');
+            };
 
-        const exportToPDF = (data) => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            document.getElementById('export-pdf').addEventListener('click', () => {
+                let data = JSON.parse(outputDiv.dataset.result);
 
-            const headers = Object.keys(data[0]);
-            const rows = data.map(item => headers.map(header => item[header]));
+                // Convert the "time@timestamp" values to a readable date format
+                data = data.map(row => {
+                    if (row['time@timestamp']) {
+                        const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
+                        row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    }
+                    return row;
+                });
 
-            doc.autoTable({
-                head: [headers],
-                body: rows,
+                exportToPDF(data);
             });
 
-            doc.save('data.pdf');
-        };
+            document.getElementById('export-csv').addEventListener('click', () => {
+                let data = JSON.parse(outputDiv.dataset.result);
 
-        document.getElementById('export-pdf').addEventListener('click', () => {
-            let data = JSON.parse(outputDiv.dataset.result);
-
-            // Convert the "time@timestamp" values to a readable date format
-            data = data.map(row => {
-                if (row['time@timestamp']) {
-                    const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
-                    row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
-                }
-                return row;
+                // Convert the "time@timestamp" values to a readable date format
+                data = data.map(row => {
+                    if (row['time@timestamp']) {
+                        const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
+                        row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    }
+                    return row;
+                });
+                exportToCSV(data);
             });
 
-            exportToPDF(data);
-        });
+            // Get all radio buttons and the period-from-to section
+            const radioButtons = document.querySelectorAll('input[name="period"]');
+            const periodFromTo = document.getElementById('period-from-to');
 
-        document.getElementById('export-csv').addEventListener('click', () => {
-            let data = JSON.parse(outputDiv.dataset.result);
+            // Add event listener to each radio button
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', async function() {
+                    // Show the period-from-to section if Custom is selected, otherwise hide it
+                    if (this.value === 'Custom') {
+                        periodFromTo.style.display = 'table-row'; // Show the row
+                    } else {
+                        periodFromTo.style.display = 'none'; // Hide the row
+                    }
 
-            // Convert the "time@timestamp" values to a readable date format
-            data = data.map(row => {
-                if (row['time@timestamp']) {
-                    const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
-                    row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
-                }
-                return row;
+                    await getTableData();
+                });
             });
-console.log(data);
-            exportToCSV(data);
-        });
-
-
-        // document.getElementById('btn__get-graph').addEventListener('click', function() {
-        //     const periodFrom = document.getElementById('PeriodFrom').value;
-        //     const periodTo = document.getElementById('PeriodTo').value;
-        //     const selectedPeriod = document.querySelector('input[name="period"]:checked').value;
-
-        //     // Display the selected values in the output div
-        //     const outputDiv = document.getElementById('output');
-        //     outputDiv.innerHTML = `
-        //         <h2>Selected Period</h2>
-        //         <p>From: ${periodFrom}</p>
-        //         <p>To: ${periodTo}</p>
-        //         <p>Period Type: ${selectedPeriod}</p>
-        //     `;
-        // });
-
-        // Get all radio buttons and the period-from-to section
-        const radioButtons = document.querySelectorAll('input[name="period"]');
-        const periodFromTo = document.getElementById('period-from-to');
-
-        // Add event listener to each radio button
-        radioButtons.forEach(radio => {
-            radio.addEventListener('change', async function() {
-                // Show the period-from-to section if Custom is selected, otherwise hide it
-                if (this.value === 'Custom') {
-                    periodFromTo.style.display = 'table-row'; // Show the row
-                } else {
-                    periodFromTo.style.display = 'none'; // Hide the row
-                }
-
-                await getTableData();
-            });
-        });
-
     </script>
 </body>
 </html>
