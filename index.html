@@ -185,16 +185,41 @@
                 // Calculate the timestamp based on the selected period
                 let formattedTimestamp;
 
+                // if (period === 'OneDay') {
+                //     const yesterday = new Date();
+                //     yesterday.setDate(yesterday.getDate() - 1);
+                //     formattedTimestamp = Math.floor(yesterday.getTime() / 1000);
+                //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                // } else if (period === 'OneWeek') {
+                //     const lastWeek = new Date();
+                //     lastWeek.setDate(lastWeek.getDate() - 7);
+                //     formattedTimestamp = Math.floor(lastWeek.getTime() / 1000);
+                //     queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                // }
+
                 if (period === 'OneDay') {
-                    const yesterday = new Date();
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    formattedTimestamp = Math.floor(yesterday.getTime() / 1000);
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    const now = new Date();
+                    const currentTimestamp = Math.floor(now.getTime() / 1000); // Current timestamp in seconds
+
+                    let twentyFourHoursAgo = new Date();
+                    twentyFourHoursAgo.setDate(twentyFourHoursAgo.getDate() - 1); // 24 hours ago
+                    formattedTimestamp = Math.floor(twentyFourHoursAgo.getTime() / 1000); // Timestamp for 24 hours ago
+
+                    // Update the query to include the range from 24 hours ago to now
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp} AND [${selectedData}].time@timestamp <= ${currentTimestamp};`;
+
                 } else if (period === 'OneWeek') {
-                    const lastWeek = new Date();
-                    lastWeek.setDate(lastWeek.getDate() - 7);
-                    formattedTimestamp = Math.floor(lastWeek.getTime() / 1000);
-                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestamp};`;
+                    const now = new Date(); // Current time
+                    let startOfPeriod = new Date();
+                    startOfPeriod.setDate(startOfPeriod.getDate() - 7); // 7 days ago
+
+                    // Convert to Unix timestamps (seconds since epoch)
+                    let startTimestamp = Math.floor(startOfPeriod.getTime() / 1000);
+                    let endTimestamp = Math.floor(now.getTime() / 1000); // Current time
+
+                    // Update the query to include the range
+                    queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${startTimestamp} AND [${selectedData}].time@timestamp <= ${endTimestamp};`;
+
                 } else if (period === 'OneMonth') {
                     const lastMonth = new Date();
                     lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -412,10 +437,12 @@
                     const now = new Date();
 
                     if (period === "OneDay") {
-                        // Get the start of the day (midnight)
-                        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 4, 0, 0, 0, 0);
+                        const now = new Date();
 
-                        // Generate labels for each hour of the day
+                        // Calculate the starting point, which is 24 hours ago from the current time
+                        const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+                        // Generate labels for each hour from 24 hours ago to now
                         for (let i = 0; i < 24; i++) {
                             const hourTime = new Date(startOfDay.getTime() + i * 60 * 60 * 1000);
                             const hours = hourTime.getHours();
@@ -433,13 +460,19 @@
                             const value = parseFloat(item[Object.keys(item)[2]]);
                             dataPoints.push({ x: exactPosition, y: value });
                         });
-                    } else if (period === "OneWeek") {
-                        // Get the start of the week (Sunday)
-                        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay(), 0, 0, 0, 0);
 
-                        // Generate labels for each 6-hour interval over the week
-                        for (let i = 0; i < 28; i++) {
-                            const intervalTime = new Date(startOfWeek.getTime() + i * 6 * 60 * 60 * 1000);
+                    } else if (period === "OneWeek") {
+                        const now = new Date();
+
+                        // Calculate the starting point, which is 7 days ago from the current time
+                        const startOfPeriod = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, now.getHours(), 0, 0, 0);
+
+                        // Calculate the number of 6-hour intervals between startOfPeriod and now
+                        const intervalCount = Math.ceil((now.getTime() - startOfPeriod.getTime()) / (6 * 60 * 60 * 1000));
+
+                        // Generate labels for each 6-hour interval from 7 days ago to now
+                        for (let i = 0; i < intervalCount; i++) {
+                            const intervalTime = new Date(startOfPeriod.getTime() + i * 6 * 60 * 60 * 1000);
                             const hours = intervalTime.getHours();
                             const periodLabel = hours < 12 ? 'AM' : 'PM';
                             const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
@@ -448,9 +481,10 @@
                         }
 
                         // Generate data points based on the 6-hour intervals
+                        console.log(data);
                         data.forEach(item => {
                             const time = new Date(item['time@timestamp'] * 1000);
-                            const timeDifference = time.getTime() - startOfWeek.getTime();
+                            const timeDifference = time.getTime() - startOfPeriod.getTime();
                             const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
                             const value = parseFloat(item[Object.keys(item)[2]]);
                             dataPoints.push({ x: exactPosition, y: value });
@@ -460,7 +494,6 @@
                     // Create the canvas element for the chart
                     const canvas = document.createElement('canvas');
                     wrapper.appendChild(canvas);
-
                     // Sorting dataPoints data
                     const sortedDataPoints = dataPoints.sort((a, b) => {
                         if (a.x === b.x) {
@@ -469,6 +502,8 @@
                             return a.x - b.x; // Otherwise, sort by x value
                         }
                     });
+                    console.log(sortedDataPoints);
+                    console.log(labels);
                     function calculateTimeFromX(x) {
                         // Extract hours
                         const hours = Math.floor(x);
@@ -538,7 +573,7 @@
                             tooltip: {
                                 callbacks: {
                                 label: function(tooltipItem) {
-                                    return `time@timestamp:` + calculateTimeFromX(tooltipItem.parsed.x) + `, data_format_index: ${tooltipItem.parsed.y}`;
+                                    return `time@timestamp:` + period == "OneDay" ? calculateTimeFromX(tooltipItem.parsed.x) : calculateTimeFromX(tooltipItem.parsed.x*6/10) + `, data_format_index: ${tooltipItem.parsed.y}`;
                                 }
                                 }
                             }
