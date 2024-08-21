@@ -1,9 +1,9 @@
 const sql = require('mssql');
 
 const config = {
-    user: 'sa',
-    password: 'asdfASDF!@#$1234',
-    server: '138.201.139.211', // or 'localhost\\SQLEXPRESS' if using a named instance
+    user: 'davidMS',
+    password: 'davidMS',
+    server: '178.220.90.59\\SQLEXPRESS', // or 'localhost\\SQLEXPRESS' if using a named instance
     database: 'Richmond',
     port: 1433,
     options: {

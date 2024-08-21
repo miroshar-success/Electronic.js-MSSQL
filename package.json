@@ -17,7 +17,10 @@
         {
           "name": "@electron-forge/maker-squirrel",
           "config": {
-            "name": "electron_quick_start"
+            "name": "electron_quick_start",
+            "noMsi": true,
+            "setupExe": "Richmond.exe",
+            "setupIcon": "assets/icon/logo.ico"
           }
         },
         {
