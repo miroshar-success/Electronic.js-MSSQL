@@ -435,6 +435,7 @@
                     const labels = [];
                     const dataPoints = [];
                     const now = new Date();
+                    const tempDataPoints = [];
 
                     if (period === "OneDay") {
                         const now = new Date();
@@ -459,6 +460,7 @@
                             const exactPosition = timeDifference / (60 * 60 * 1000); // Convert time difference to hours
                             const value = parseFloat(item[Object.keys(item)[2]]);
                             dataPoints.push({ x: exactPosition, y: value });
+                            tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
                         });
 
                     } else if (period === "OneWeek") {
@@ -488,6 +490,7 @@
                             const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
                             const value = parseFloat(item[Object.keys(item)[2]]);
                             dataPoints.push({ x: exactPosition, y: value });
+                            tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
                         });
                     }
 
@@ -573,7 +576,7 @@
                             tooltip: {
                                 callbacks: {
                                 label: function(tooltipItem) {
-                                    return `time@timestamp:` + period == "OneDay" ? calculateTimeFromX(tooltipItem.parsed.x) : calculateTimeFromX(tooltipItem.parsed.x*6/10) + `, data_format_index: ${tooltipItem.parsed.y}`;
+                                    return `time@timestamp:` + (tempDataPoints.find(point => point.x == tooltipItem.parsed.x) ? tempDataPoints.find(point => point.x == tooltipItem.parsed.x).t : null) + `, data_format_index: ${tooltipItem.parsed.y}`;
                                 }
                                 }
                             }
