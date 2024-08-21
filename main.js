@@ -1,32 +1,37 @@
 const { app, BrowserWindow } = require('electron');
-const path = require('path');
+
+let mainWindow;
 
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 800,
-        height: 600,
-        frame: true, // Show the window frame (title bar)
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // For simplicity; use context isolation in production
-        },
-    });
+  mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
 
-    win.maximize(); // Maximize the window
-    win.loadFile('index.html');
+  mainWindow.loadFile('index.html');
 }
 
+const gotTheLock = app.requestSingleInstanceLock();
 
-app.whenReady().then(createWindow);
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
 
-app.on('window-all-closed', () => {
+  app.on('ready', createWindow);
+
+  app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        app.quit();
+      app.quit();
     }
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
+  });
+}

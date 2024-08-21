@@ -44,7 +44,6 @@
     "@electron-forge/maker-squirrel": "^7.4.0",
     "@electron-forge/maker-zip": "^7.4.0",
     "electron": "^31.4.0",
-    "electron-prebuilt-compile": "^8.2.0",
     "mysql2": "latest"
   },
   "build": {
