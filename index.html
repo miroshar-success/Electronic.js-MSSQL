@@ -71,10 +71,9 @@
             animation: spin 2s linear infinite;
         }
 
-        #close-button {
+        #logo-icon {
             width: 40px;
             float: right;
-            cursor: pointer;
         }
 
         .site-title {
@@ -111,7 +110,7 @@
     </div>
     <div style="align-content: baseline;">
         <h1 class="site-title">Richmond System</h1>
-        <img src="assets/icon/close.png" id="close-button" alt="close">
+        <img src="assets/icon/logo.png" id="logo-icon" alt="logo">
     </div>
     
     
@@ -314,9 +313,9 @@
                         queryWhere = ` WHERE [${selectedData}].time@timestamp >= ${formattedTimestampFrom} AND [${selectedData}].time@timestamp <= ${formattedTimestampTo};`;
                     }
                     // let query = `SELECT * FROM [${selectedData}] ` + queryWhere;
-                    let query = `SELECT [${selectedData}].data_index, 
-                        [${selectedData}].time@timestamp, 
-                        [${selectedData}].data_format_${selectedFormatData.value} as data_format_${selectedFormatData.value}
+                    let query = `SELECT [${selectedData}].data_index as "Index", 
+                        [${selectedData}].time@timestamp as "Timestamp", 
+                        [${selectedData}].data_format_${selectedFormatData.value} as "Value"
                         FROM [${selectedData}] ` + queryWhere;
                     const result = await queryDatabase(query);
 
@@ -353,7 +352,7 @@
                         const topControlPanel = document.createElement('div');
                         topControlPanel.style.display = 'flex';
                         topControlPanel.style.justifyContent = 'flex-start';
-                        topControlPanel.style.marginBottom = '10px';
+                        topControlPanel.style.marginBottom = '30px';
 
                         const entriesSelectLabel = document.createElement('label');
                         entriesSelectLabel.textContent = 'Entries per page: ';
@@ -396,15 +395,11 @@
                             const headerRow = header.insertRow(0);
                             Object.keys(data[0]).forEach((key, index) => {
                                 const cell = headerRow.insertCell();
-                                if (index === 0) {
-                                    cell.style.display = 'none';
-                                } else {
-                                    cell.innerHTML = `<strong>${key}</strong>`;
-                                    cell.style.position = 'sticky';
-                                    cell.style.top = '0';
-                                    cell.style.backgroundColor = '#fff';
-                                    cell.style.zIndex = '10';
-                                }
+                                cell.innerHTML = `<strong>${key}</strong>`;
+                                cell.style.position = 'sticky';
+                                cell.style.top = '0';
+                                cell.style.backgroundColor = '#fff';
+                                cell.style.zIndex = '10';
                             });
 
                             const tbody = table.createTBody();
@@ -416,16 +411,12 @@
 
                                 Object.entries(item).forEach(([key, value], index) => {
                                     const cell = row.insertCell();
-                                    if (index === 0) {
-                                        cell.style.display = 'none';
+                                    if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
+                                        const date = new Date(value * 1000);
+                                        const formattedDateTime = date.toLocaleString();
+                                        cell.textContent = formattedDateTime;
                                     } else {
-                                        if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
-                                            const date = new Date(value * 1000);
-                                            const formattedDateTime = date.toLocaleString();
-                                            cell.textContent = formattedDateTime;
-                                        } else {
-                                            cell.textContent = value;
-                                        }
+                                        cell.textContent = value;
                                     }
                                 });
                             });
@@ -496,6 +487,7 @@
                         // wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
                         wrapper.style.width = '100%'; // Set width to 100%
                         wrapper.style.height = "600px";
+                        wrapper.style.marginBottom = "30px";
                         wrapper.id = 'statistic-graph'; // Set class name
 
                         const labels = [];
@@ -524,7 +516,7 @@
 
                             // Generate data points based on the hour intervals
                             data.forEach(item => {
-                                const time = new Date(item['time@timestamp'] * 1000);
+                                const time = new Date(item['Timestamp'] * 1000);
                                 const timeDifference = time.getTime() - startOfDay.getTime();
                                 const exactPosition = timeDifference / (60 * 60 * 1000); // Convert time difference to hours
                                 const value = parseFloat(item[Object.keys(item)[2]]);
@@ -553,7 +545,7 @@
 
                             // Generate data points based on the 6-hour intervals
                             data.forEach(item => {
-                                const time = new Date(item['time@timestamp'] * 1000);
+                                const time = new Date(item['Timestamp'] * 1000);
                                 const timeDifference = time.getTime() - startOfPeriod.getTime();
                                 const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
                                 const value = parseFloat(item[Object.keys(item)[2]]);
@@ -586,7 +578,7 @@
 
                             // Generate data points based on the 6-hour intervals
                             data.forEach(item => {
-                                const time = new Date(item['time@timestamp'] * 1000);
+                                const time = new Date(item['Timestamp'] * 1000);
                                 const timeDifference = time.getTime() - startOfPeriod.getTime();
                                 const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
                                 const value = parseFloat(item[Object.keys(item)[2]]);
@@ -667,7 +659,7 @@
                                             label: function(tooltipItem) {
                                                 const timestamp = tempDataPoints.find(point => point.x == tooltipItem.parsed.x)?.t || null;
                                                 // Return only the custom tooltip data
-                                                return `time@timestamp: ${timestamp}, data_format_index: ${tooltipItem.parsed.y}`;
+                                                return `Timestamp: ${timestamp}, Value: ${tooltipItem.parsed.y}`;
                                             },
                                             // To completely hide the default Y-axis value
                                             title: function() {
@@ -700,6 +692,9 @@
             };
 
             const exportToCSV = (data) => {
+                const selectElement = document.getElementById('data-select');
+                const selectedOption = selectElement.options[selectElement.selectedIndex];
+                const selectedText = selectedOption.text;
                 const csvRows = [];
                 const headers = Object.keys(data[0]);
                 csvRows.push(headers.join(','));
@@ -715,11 +710,14 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.setAttribute('href', url);
-                a.setAttribute('download', 'data.csv');
+                a.setAttribute('download', selectedText + '.csv');
                 a.click();
             };
 
             const exportToPDF = (data) => {
+                const selectElement = document.getElementById('data-select');
+                const selectedOption = selectElement.options[selectElement.selectedIndex];
+                const selectedText = selectedOption.text;
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
 
@@ -750,7 +748,7 @@
                         });
 
                         // Save the PDF after everything is added
-                        doc.save('data.pdf');
+                        doc.save(selectedText + '.pdf');
                     });
                 } else {
                     // If there's no graph, just add the table
@@ -759,7 +757,7 @@
                         body: rows,
                     });
 
-                    doc.save('data.pdf');
+                    doc.save(selectedText + '.pdf');
                 }
             };
 
@@ -769,18 +767,12 @@
 
                 // Convert the "time@timestamp" values to a readable date format
                 data = data.map(row => {
-                    // Remove the first item of the row
-                    const updatedRow = Object.entries(row).slice(1).reduce((acc, [key, value]) => {
-                        acc[key] = value;
-                        return acc;
-                    }, {});
-
-                    if (updatedRow['time@timestamp']) {
-                        const date = new Date(updatedRow['time@timestamp'] * 1000); // Convert to milliseconds
-                        updatedRow['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    if (row['Timestamp']) {
+                        const date = new Date(row['Timestamp'] * 1000); // Convert to milliseconds
+                        row['Timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
                     }
 
-                    return updatedRow;
+                    return row;
                 });
 
                 exportToPDF(data);
@@ -789,21 +781,14 @@
 
             document.getElementById('export-csv').addEventListener('click', () => {
                 let data = JSON.parse(outputDiv.dataset.result);
-
                 // Convert the "time@timestamp" values to a readable date format
                 data = data.map(row => {
-                    // Remove the first item of the row
-                    const updatedRow = Object.entries(row).slice(1).reduce((acc, [key, value]) => {
-                        acc[key] = value;
-                        return acc;
-                    }, {});
-
-                    if (updatedRow['time@timestamp']) {
-                        const date = new Date(updatedRow['time@timestamp'] * 1000); // Convert to milliseconds
-                        updatedRow['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    if (row['Timestamp']) {
+                        const date = new Date(row['Timestamp'] * 1000); // Convert to milliseconds
+                        row['Timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
                     }
 
-                    return updatedRow;
+                    return row;
                 });
 
                 exportToCSV(data);
@@ -812,10 +797,6 @@
 
             document.getElementById('btn__get-graph').addEventListener('click', async() => {
                 await getTableData();
-            });
-
-            document.getElementById('close-button').addEventListener('click', () => {
-                window.close();
             });
             // Get all radio buttons and the period-from-to section
             const radioButtons = document.querySelectorAll('input[name="period"]');
