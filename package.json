@@ -62,8 +62,10 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": "nsis",
-      "sign": false,
+      "target": [
+        "nsis"
+      ],
+      "arch": ["ia32"],
       "icon": "assets/icon/logo.ico"
     }
   },

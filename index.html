@@ -99,7 +99,6 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    <!-- Add this script tag to your HTML file -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <script src="assets/js/Chart.js-master/chart.js"></script>
@@ -765,32 +764,50 @@
 
             document.getElementById('export-pdf').addEventListener('click', () => {
                 let data = JSON.parse(outputDiv.dataset.result);
+                console.log(data);
 
                 // Convert the "time@timestamp" values to a readable date format
                 data = data.map(row => {
-                    if (row['time@timestamp']) {
-                        const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
-                        row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    // Remove the first item of the row
+                    const updatedRow = Object.entries(row).slice(1).reduce((acc, [key, value]) => {
+                        acc[key] = value;
+                        return acc;
+                    }, {});
+
+                    if (updatedRow['time@timestamp']) {
+                        const date = new Date(updatedRow['time@timestamp'] * 1000); // Convert to milliseconds
+                        updatedRow['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
                     }
-                    return row;
+
+                    return updatedRow;
                 });
 
                 exportToPDF(data);
             });
+
 
             document.getElementById('export-csv').addEventListener('click', () => {
                 let data = JSON.parse(outputDiv.dataset.result);
 
                 // Convert the "time@timestamp" values to a readable date format
                 data = data.map(row => {
-                    if (row['time@timestamp']) {
-                        const date = new Date(row['time@timestamp'] * 1000); // Convert to milliseconds
-                        row['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
+                    // Remove the first item of the row
+                    const updatedRow = Object.entries(row).slice(1).reduce((acc, [key, value]) => {
+                        acc[key] = value;
+                        return acc;
+                    }, {});
+
+                    if (updatedRow['time@timestamp']) {
+                        const date = new Date(updatedRow['time@timestamp'] * 1000); // Convert to milliseconds
+                        updatedRow['time@timestamp'] = date.toLocaleString('en-US'); // Format to MM/DD/YYYY, HH:MM:SS AM/PM
                     }
-                    return row;
+
+                    return updatedRow;
                 });
+
                 exportToCSV(data);
             });
+
 
             document.getElementById('btn__get-graph').addEventListener('click', async() => {
                 await getTableData();
