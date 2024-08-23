@@ -12,7 +12,9 @@
   },
   "config": {
     "forge": {
-      "packagerConfig": {},
+      "packagerConfig": {
+        "icon": "assets/icon/logo"
+      },
       "makers": [
         {
           "name": "@electron-forge/maker-squirrel",
@@ -65,8 +67,13 @@
       "target": [
         "nsis"
       ],
-      "arch": ["ia32"],
-      "icon": "assets/icon/logo.ico"
+      "icon": "assets/icon/logo.ico",
+      "sign": false,
+      "artifactName": "Richmond-${arch}-${version}.${ext}",
+      "arch": [
+        "ia32",
+        "x64"
+      ]
     }
   },
   "dependencies": {
