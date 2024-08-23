@@ -71,6 +71,15 @@
             animation: spin 2s linear infinite;
         }
 
+        #close-button {
+            width: 40px;
+            float: right;
+            cursor: pointer;
+        }
+
+        .site-title {
+            float: left;
+        }
         @-webkit-keyframes spin {
             0% { -webkit-transform: rotate(0deg); }
             100% { -webkit-transform: rotate(360deg); }
@@ -90,6 +99,9 @@
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <!-- Add this script tag to your HTML file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <script src="assets/js/Chart.js-master/chart.js"></script>
 </head>
 <body>
@@ -98,8 +110,11 @@
         <div class="spinner"></div>
         <p>Loading...</p>
     </div>
-
-    <h1>Richmond System</h1>
+    <div style="align-content: baseline;">
+        <h1 class="site-title">Richmond System</h1>
+        <img src="assets/icon/close.png" id="close-button" alt="close">
+    </div>
+    
     
     <label for="data-select">Select Data Source:</label>
     <select id="data-select" onchange="fetchTableFormats()"></select>
@@ -118,7 +133,9 @@
                     
                     <input type="radio" class="input__radio-2" id="period-week" value="OneWeek" name="period">
                     <label for="period-week">1 Week</label>
-                    
+
+                    <input type="radio" class="input__radio-2" id="period-custom" value="Custom" name="period">
+                    <label for="period-custom">Custom</label>
                     <!-- <input type="radio" class="input__radio-2" id="period-month" value="OneMonth" name="period">
                     <label for="period-month">1 Month</label>
                     
@@ -127,9 +144,7 @@
                     
                     <input type="radio" class="input__radio-2" id="period-year" value="OneYear" name="period">
                     <label for="period-year">1 Year</label>
-                    
-                    <input type="radio" class="input__radio-2" id="period-custom" value="Custom" name="period">
-                    <label for="period-custom">Custom</label> -->
+                    -->
                 </div>
             </td>
             <td></td>
@@ -143,12 +158,12 @@
                 -
                 <input value="2024-08-19T10:00" class="input input--text input--medium" id="PeriodTo" name="PeriodTo" type="datetime-local">
                 <span class="field-validation-valid" data-valmsg-for="PeriodTo"></span>
-                <!-- <button class="btn btn--low column__box--solo" type="button" id="btn__get-graph">Confirm</button> -->
+                <button class="btn btn--low column__box--solo" type="button" id="btn__get-graph">Confirm</button>
             </td>
             <td></td>
         </tr>
     </table>    
-
+    <div id="output_graph"></div>
     <div id="output"></div>
     <div id="chart-container"></div>
     <script>
@@ -157,6 +172,7 @@
             const { connectToDatabase, queryDatabase } = require('./db');
             // Declare outputDiv at the top
             const outputDiv = document.getElementById('output');
+            const outputGraphDiv = document.getElementById('output_graph');
             const fetchTableNames = async () => {
                 try {
                     await connectToDatabase();
@@ -175,6 +191,7 @@
                     selectElement.innerHTML = '';
                     filteredTables.forEach(table => {
                         const tableName = table.TABLE_NAME.replace(/^cMT-4429_/, '').replace(/_data$/, '');
+                        // const tableName = table.TABLE_NAME.replace(/^hostname_/, '').replace(/_data$/, '');
                         const option = document.createElement('option');
                         option.value = table.TABLE_NAME;
                         option.textContent = tableName;
@@ -303,6 +320,7 @@
                         [${selectedData}].data_format_${selectedFormatData.value} as data_format_${selectedFormatData.value}
                         FROM [${selectedData}] ` + queryWhere;
                     const result = await queryDatabase(query);
+
                     // // Assume you have a mapping of comments
                     // const commentsMapping = await queryDatabase(`SELECT * from [${selectedData}_format]`);
                     // // Transform the data
@@ -377,32 +395,38 @@
 
                             const header = table.createTHead();
                             const headerRow = header.insertRow(0);
-                            Object.keys(data[0]).forEach(key => {
+                            Object.keys(data[0]).forEach((key, index) => {
                                 const cell = headerRow.insertCell();
-                                cell.innerHTML = `<strong>${key}</strong>`;
-                                cell.style.position = 'sticky';
-                                cell.style.top = '0';
-                                cell.style.backgroundColor = '#fff';
-                                cell.style.zIndex = '10';
+                                if (index === 0) {
+                                    cell.style.display = 'none';
+                                } else {
+                                    cell.innerHTML = `<strong>${key}</strong>`;
+                                    cell.style.position = 'sticky';
+                                    cell.style.top = '0';
+                                    cell.style.backgroundColor = '#fff';
+                                    cell.style.zIndex = '10';
+                                }
                             });
 
                             const tbody = table.createTBody();
                             const start = (currentPage - 1) * entriesPerPage;
                             const end = Math.min(start + entriesPerPage, data.length);
                             const currentData = data.slice(start, end);
-
                             currentData.forEach(item => {
                                 const row = tbody.insertRow();
 
                                 Object.entries(item).forEach(([key, value], index) => {
                                     const cell = row.insertCell();
-
-                                    if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
-                                        const date = new Date(value * 1000);
-                                        const formattedDateTime = date.toLocaleString();
-                                        cell.textContent = formattedDateTime;
+                                    if (index === 0) {
+                                        cell.style.display = 'none';
                                     } else {
-                                        cell.textContent = value;
+                                        if (typeof value === 'number' && value > 0 && value < 2147483647 && index === 1) {
+                                            const date = new Date(value * 1000);
+                                            const formattedDateTime = date.toLocaleString();
+                                            cell.textContent = formattedDateTime;
+                                        } else {
+                                            cell.textContent = value;
+                                        }
                                     }
                                 });
                             });
@@ -472,12 +496,16 @@
                         const wrapper = document.createElement('div');
                         wrapper.style.overflowX = 'auto'; // Enable horizontal scrolling
                         wrapper.style.width = '100%'; // Set width to 100%
+                        wrapper.id = 'statistic-graph'; // Set class name
 
                         const labels = [];
                         const dataPoints = [];
                         const now = new Date();
                         const tempDataPoints = [];
-
+                        
+                        const selectElement = document.getElementById('data-select');
+                        const selectedOption = selectElement.options[selectElement.selectedIndex];
+                        const selectedText = selectedOption.text;
                         if (period === "OneDay") {
                             const now = new Date();
 
@@ -532,6 +560,39 @@
                                 dataPoints.push({ x: exactPosition, y: value });
                                 tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
                             });
+                        } else if (period === "Custom") {
+                            const periodFrom = document.getElementById('PeriodFrom').value;
+                            const periodTo = document.getElementById('PeriodTo').value;
+                            // Create Date objects from the string inputs
+                            const dateFrom = new Date(periodFrom);
+                            const dateTo = new Date(periodTo);
+
+                            // Calculate the starting point and end point
+                            const startOfPeriod = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate(), dateFrom.getHours(), 0, 0, 0);
+                            const endOfPeriod = new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), dateTo.getHours(), 0, 0, 0);
+
+                            // Calculate the number of 6-hour intervals between startOfPeriod and now
+                            const intervalCount = Math.ceil((endOfPeriod.getTime() - startOfPeriod.getTime()) / (6 * 60 * 60 * 1000));
+
+                            // Generate labels for each 6-hour interval from 7 days ago to now
+                            for (let i = 0; i < intervalCount; i++) {
+                                const intervalTime = new Date(startOfPeriod.getTime() + i * 6 * 60 * 60 * 1000);
+                                const hours = intervalTime.getHours();
+                                const periodLabel = hours < 12 ? 'AM' : 'PM';
+                                const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
+                                const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
+                                labels.push(label);
+                            }
+
+                            // Generate data points based on the 6-hour intervals
+                            data.forEach(item => {
+                                const time = new Date(item['time@timestamp'] * 1000);
+                                const timeDifference = time.getTime() - startOfPeriod.getTime();
+                                const exactPosition = timeDifference / (6 * 60 * 60 * 1000); // Convert time difference to 6-hour intervals
+                                const value = parseFloat(item[Object.keys(item)[2]]);
+                                dataPoints.push({ x: exactPosition, y: value });
+                                tempDataPoints.push({ x: exactPosition, t: time.toLocaleString('en-US') });
+                            });
                         }
 
                         // Create the canvas element for the chart
@@ -545,33 +606,10 @@
                                 return a.x - b.x; // Otherwise, sort by x value
                             }
                         });
-                        function calculateTimeFromX(x) {
-                            // Extract hours
-                            const hours = Math.floor(x);
-
-                            // Extract minutes
-                            const minutesDecimal = (x - hours) * 60;
-                            const minutes = Math.floor(minutesDecimal);
-
-                            // Extract seconds
-                            const secondsDecimal = (minutesDecimal - minutes) * 60;
-                            const seconds = Math.floor(secondsDecimal);
-
-                            // Determine AM/PM
-                            const period = hours < 12 ? 'AM' : 'PM';
-
-                            // Convert to 12-hour format
-                            const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
-
-                            // Pad minutes and seconds with leading zeros if necessary
-                            const paddedMinutes = String(minutes).padStart(2, '0');
-                            const paddedSeconds = String(seconds).padStart(2, '0');
-
-                            // Format the time string
-                            const timeString = `${formattedHours}:${paddedMinutes}:${paddedSeconds} ${period}`;
-                            return timeString;
-                        }
                         const ctx = canvas.getContext('2d');
+
+                        console.log(period + "---" + labels);
+                        console.log(period + "---" + sortedDataPoints[0].x);
                         const myChart = new Chart(ctx, {
                             type: 'line',
                             data: {
@@ -598,7 +636,7 @@
                                         },
                                         ticks: {
                                             callback: function(value, index, values) {
-                                                const labelIndex = Math.round(value);  // Assuming your x values align with the index
+                                                const labelIndex = Math.floor(value);  // Assuming your x values align with the index
                                                 return labels[labelIndex] || '';       // Return corresponding label or empty string
                                             },
                                             stepSize: 1, // Set step size to 1 to match your data points
@@ -613,6 +651,17 @@
                                     }
                                 },
                                 plugins: {
+                                    title: {
+                                        display: true,
+                                        text: selectedText,  // Set your desired chart title
+                                        font: {
+                                            size: 18   // You can set the font size
+                                        },
+                                        padding: {
+                                            top: 10,
+                                            bottom: 10
+                                        }
+                                    },
                                     tooltip: {
                                         callbacks: {
                                             label: function(tooltipItem) {
@@ -638,8 +687,9 @@
                         const table = createTable(result);
                         const graph = createGraph(result);
                         outputDiv.innerHTML = '';
+                        outputGraphDiv.innerHTML = '';
+                        outputGraphDiv.appendChild(graph);
                         outputDiv.appendChild(table);
-                        outputDiv.appendChild(graph);
                         outputDiv.dataset.result = JSON.stringify(result); // Store result for export
                     }
                     document.getElementById('loading-screen').style.display = 'none';
@@ -673,15 +723,44 @@
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
 
+                // Convert the table data into arrays for jsPDF's autoTable
                 const headers = Object.keys(data[0]);
                 const rows = data.map(item => headers.map(header => item[header]));
 
-                doc.autoTable({
-                    head: [headers],
-                    body: rows,
-                });
+                // Select the div element with the id "statistic-graph"
+                const statisticGraphDiv = document.getElementById('statistic-graph');
 
-                doc.save('data.pdf');
+                if (statisticGraphDiv) {
+                    // Use html2canvas to convert the div to an image
+                    html2canvas(statisticGraphDiv).then((canvas) => {
+                        const imgData = canvas.toDataURL('image/png');
+
+                        // Calculate the width and height for the image
+                        const imgWidth = 190; // Width in mm (A4 paper width minus margins)
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width; // Maintain aspect ratio
+
+                        // Add the image to the PDF at the top (10, 10 is the starting point)
+                        doc.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+
+                        // Add the table below the image
+                        doc.autoTable({
+                            head: [headers],
+                            body: rows,
+                            startY: 10 + imgHeight + 10, // Position the table 10mm below the image
+                        });
+
+                        // Save the PDF after everything is added
+                        doc.save('data.pdf');
+                    });
+                } else {
+                    // If there's no graph, just add the table
+                    doc.autoTable({
+                        head: [headers],
+                        body: rows,
+                    });
+
+                    doc.save('data.pdf');
+                }
             };
 
             document.getElementById('export-pdf').addEventListener('click', () => {
@@ -713,6 +792,13 @@
                 exportToCSV(data);
             });
 
+            document.getElementById('btn__get-graph').addEventListener('click', async() => {
+                await getTableData();
+            });
+
+            document.getElementById('close-button').addEventListener('click', () => {
+                window.close();
+            });
             // Get all radio buttons and the period-from-to section
             const radioButtons = document.querySelectorAll('input[name="period"]');
             const periodFromTo = document.getElementById('period-from-to');
