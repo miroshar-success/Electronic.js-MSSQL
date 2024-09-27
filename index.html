@@ -520,7 +520,7 @@
                                 const hours = hourTime.getHours();
                                 const periodLabel = hours < 12 ? 'AM' : 'PM';
                                 const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
-                                const label = `${hourTime.getMonth() + 1}/${hourTime.getDate()} ${formattedTime}`;
+                                const label = `${hourTime.getDate()}/${hourTime.getMonth() + 1} ${formattedTime}`;
                                 labels.push(label);
                             }
 
@@ -549,7 +549,7 @@
                                 const hours = intervalTime.getHours();
                                 const periodLabel = hours < 12 ? 'AM' : 'PM';
                                 const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
-                                const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
+                                const label = `${intervalTime.getDate()}/${intervalTime.getMonth() + 1} ${formattedTime}`;
                                 labels.push(label);
                             }
 
@@ -582,7 +582,7 @@
                                 const hours = intervalTime.getHours();
                                 const periodLabel = hours < 12 ? 'AM' : 'PM';
                                 const formattedTime = `${(hours % 12) || 12} ${periodLabel}`;
-                                const label = `${intervalTime.getMonth() + 1}/${intervalTime.getDate()} ${formattedTime}`;
+                                const label = `${intervalTime.getDate()}/${intervalTime.getMonth() + 1} ${formattedTime}`;
                                 labels.push(label);
                             }
 
@@ -612,7 +612,12 @@
 
                         console.log(period + "---" + labels);
                         console.log(period + "---" + sortedDataPoints[0].x);
-                        const myChart = new Chart(ctx, {
+                        let myChart;
+
+                        if (myChart) {
+                            myChart.destroy();  // Clean up the previous chart instance if it exists
+                        }
+                        myChart = new Chart(ctx, {
                             type: 'line',
                             data: {
                                 datasets: [{
@@ -667,6 +672,11 @@
                                     }
                                 },
                                 plugins: {
+                                    decimation: {
+                                        enabled: true, // Enable the plugin
+                                        algorithm: 'lttb', // 'lttb' (Largest Triangle Three Buckets) algorithm is the most commonly used
+                                        samples: 10000, // The number of points to display
+                                    },
                                     title: {
                                         display: true,
                                         text: selectedText,  // Set your desired chart title
