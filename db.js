@@ -1,22 +1,9 @@
 const sql = require('mssql');
 
-// const config = {
-//     user: 'davidMS',
-//     password: 'davidMS',
-//     server: 'localhost\\SQLEXPRESS', // or 'localhost\\SQLEXPRESS' if using a named instance
-//     database: 'Richmond',
-//     port: 1433,
-//     options: {
-//         encrypt: false, // Set to true if using Azure
-//         trustServerCertificate: true, // Change to false if you have a valid certificate
-//         connectionTimeout: 30000, // 30 seconds
-//     }
-// };
-
 const config = {
-    user: 'sa',
-    password: 'asdfASDF!@#$1234',
-    server: '138.201.139.211', // or 'localhost\\SQLEXPRESS' if using a named instance
+    user: 'richmond',
+    password: 'richmond',
+    server: 'localhost', // or 'localhost\\SQLEXPRESS' if using a named instance
     database: 'Richmond',
     port: 1433,
     options: {
@@ -25,6 +12,19 @@ const config = {
         connectionTimeout: 30000, // 30 seconds
     }
 };
+
+// const config = {
+//     user: 'sa',
+//     password: 'asdfASDF!@#$1234',
+//     server: '138.201.139.211', // or 'localhost\\SQLEXPRESS' if using a named instance
+//     database: 'Richmond',
+//     port: 1433,
+//     options: {
+//         encrypt: false, // Set to true if using Azure
+//         trustServerCertificate: true, // Change to false if you have a valid certificate
+//         connectionTimeout: 30000, // 30 seconds
+//     }
+// };
 
 
 async function connectToDatabase() {
