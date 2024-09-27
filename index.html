@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Richmond System</title>
+    <title>Data Report Historian</title>
     <style>
         .noborder { border: none; }
         .input--medium { width: 200px; }
@@ -72,7 +72,6 @@
         }
 
         #logo-icon {
-            width: 40px;
             float: right;
         }
 
@@ -109,8 +108,8 @@
         <p>Loading...</p>
     </div>
     <div style="align-content: baseline;">
-        <h1 class="site-title">Richmond System</h1>
-        <img src="assets/icon/logo.ico" id="logo-icon" alt="logo">
+        <h1 class="site-title">Richmond RAAF WTP System</h1>
+        <img src="assets/icon/Aquacell_LOGO.webp" id="logo-icon" alt="logo">
     </div>
     
     
@@ -506,7 +505,7 @@
                         const now = new Date();
                         const tempDataPoints = [];
                         
-                        const selectElement = document.getElementById('data-select');
+                        const selectElement = document.getElementById('data-format-select');
                         const selectedOption = selectElement.options[selectElement.selectedIndex];
                         const selectedText = selectedOption.text;
                         if (period === "OneDay") {
@@ -624,11 +623,13 @@
                                     borderWidth: 1,
                                     spanGaps: true,
                                     fill: false,
-                                    pointRadius: 5,            // Hide the data point markers
-                                    pointHoverRadius: 15,        // Show a marker when hovering
+                                    pointRadius: 2,            // Hide the data point markers
+                                    pointHoverRadius: 4,        // Show a marker when hovering
                                 }]
                             },
                             options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
                                 scales: {
                                     x: {
                                         type: 'linear',  // Set the x-axis to be a linear scale
@@ -642,15 +643,27 @@
                                                 const labelIndex = Math.floor(value);  // Assuming your x values align with the index
                                                 return labels[labelIndex] || '';       // Return corresponding label or empty string
                                             },
-                                            stepSize: 1, // Set step size to 1 to match your data points
-                                        }
+                                            stepSize: 1, 
+                                        },
+                                        min: 0,          // Optional: Set minimum x value to avoid overflow
+                                        max: labels.length - 1 // Optional: Set max to the number of labels minus one
                                     },
                                     y: {
                                         title: {
                                             display: true,
                                             text: 'Value'
                                         },
-                                        beginAtZero: true
+                                        beginAtZero: true,
+                                        min: 0,
+                                        max: Math.max(...sortedDataPoints.map(p => p.y)) + 10
+                                    }
+                                },
+                                layout: {
+                                    padding: {
+                                        left: 10,      // Add padding to prevent overflow near edges
+                                        right: 10,
+                                        top: 20,
+                                        bottom: 10
                                     }
                                 },
                                 plugins: {
