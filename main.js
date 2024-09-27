@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const spawn = require('child_process').spawn;
 
@@ -14,7 +14,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('login.html');
 }
 
 const squirrelEvent = process.argv[1];
@@ -84,4 +84,19 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+// Handle data from login screen
+ipcMain.on('login-submit', (event, credentials) => {
+  // Store credentials or pass them to db.js
+  // You can either call db.js from here or store them for later use
+  global.dbCredentials = credentials;
+
+  // Now load index.html after successful login
+  mainWindow.loadFile('index.html');
+});
+
+ipcMain.handle('get-db-credentials', async () => {
+  // Pass the stored credentials from the login page to the renderer
+  return global.dbCredentials;
 });

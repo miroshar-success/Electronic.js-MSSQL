@@ -168,12 +168,17 @@
       
             document.getElementById('loading-screen').style.display = 'flex';
             const { connectToDatabase, queryDatabase } = require('./db');
+            const { ipcRenderer } = require('electron');
             // Declare outputDiv at the top
+            let credentials =null;
             const outputDiv = document.getElementById('output');
             const outputGraphDiv = document.getElementById('output_graph');
             const fetchTableNames = async () => {
                 try {
-                    await connectToDatabase();
+                    if (!credentials) {
+                        credentials = await ipcRenderer.invoke('get-db-credentials');
+                    }
+                    await connectToDatabase(credentials);
                     const tables = await queryDatabase("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';");
                     const selectElement = document.getElementById('data-select');
                     const filteredTables = tables.filter(table => table.TABLE_NAME.endsWith('_data'));
@@ -205,7 +210,10 @@
 
             const fetchTableFormats = async () => {
                 try {
-                    await connectToDatabase();
+                    if (!credentials) {
+                        credentials = await ipcRenderer.invoke('get-db-credentials');
+                    }
+                    await connectToDatabase(credentials);
                     const selectFormatElement = document.getElementById('data-format-select');
                     selectFormatElement.innerHTML = '';
 
@@ -229,7 +237,10 @@
             
             const getTableData = async () => {
                 try {
-                    await connectToDatabase();
+                    if (!credentials) {
+                        credentials = await ipcRenderer.invoke('get-db-credentials');
+                    }
+                    await connectToDatabase(credentials);
                     const selectedData = document.getElementById('data-select').value;
                     const selectedFormatData = document.getElementById('data-format-select');
                     // Check which period is selected

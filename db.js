@@ -1,18 +1,5 @@
 const sql = require('mssql');
 
-const config = {
-    user: 'richmond',
-    password: 'richmond',
-    server: 'localhost', // or 'localhost\\SQLEXPRESS' if using a named instance
-    database: 'Richmond',
-    port: 1433,
-    options: {
-        encrypt: false, // Set to true if using Azure
-        trustServerCertificate: true, // Change to false if you have a valid certificate
-        connectionTimeout: 30000, // 30 seconds
-    }
-};
-
 // const config = {
 //     user: 'sa',
 //     password: 'asdfASDF!@#$1234',
@@ -27,7 +14,21 @@ const config = {
 // };
 
 
-async function connectToDatabase() {
+async function connectToDatabase(credentials) {
+    console.log(credentials);
+    const config = {
+        user: credentials.username,
+        password: credentials.password,
+        database: credentials.dbname,
+        server: credentials.server,
+        port: 1433,
+        options: {
+            encrypt: false, // Set to true if using Azure
+            trustServerCertificate: true, // Change to false if you have a valid certificate
+            connectionTimeout: 30000, // 30 seconds
+        }
+    };
+    
     try {
         await sql.connect(config);
         console.log('Connected to SQL Server');

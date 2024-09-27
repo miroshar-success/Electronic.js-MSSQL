@@ -57,6 +57,7 @@
     "files": [
       "main.js",
       "index.html",
+      "login.html",
       "db.js",
       "node_modules/**/*"
     ],
