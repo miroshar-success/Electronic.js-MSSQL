@@ -120,6 +120,17 @@
 
     <script>
         const { ipcRenderer } = require('electron');
+        
+        // On load, fill the login fields with saved info
+        window.onload = async () => {
+            const loginInfo = await ipcRenderer.invoke('get-login-info');
+            if (loginInfo) {
+            document.getElementById('username').value = loginInfo.s_username || '';
+            document.getElementById('password').value = loginInfo.s_password || '';
+            document.getElementById('dbname').value = loginInfo.s_dbname || '';
+            document.getElementById('server').value = loginInfo.s_server || '';
+            }
+        };
 
         document.getElementById('loginForm').addEventListener('submit', function (e) {
             e.preventDefault();

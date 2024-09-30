@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    h1 {
+      text-align: center;
+    }
+    form {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    label, input {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    input {
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input:focus {
+        border: 2px solid yellow;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .actions {
+      display: flex;
+      justify-content: space-between;
+    }
+    .close-button {
+      background-color: #dc3545;
+    }
+    .close-button:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Save Login Info</h1>
+  <form id="settings-form">
+    <label for="s_username">Username:</label>
+    <input type="text" id="s_username" name="s_username"><br>
+
+    <label for="s_password">Password:</label>
+    <input type="password" id="s_password" name="s_password"><br>
+
+    <label for="s_dbname">Database Name:</label>
+    <input type="text" id="s_dbname" name="s_dbname"><br>
+
+    <label for="s_server">Server:</label>
+    <input type="text" id="s_server" name="s_server"><br>
+
+    <div class="actions">
+      <button type="submit">Save</button>
+      <button type="button" class="close-button" id="close-button">Close</button>
+    </div>
+  </form>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // Load existing login info when the settings page is opened
+    window.onload = async () => {
+      const loginInfo = await ipcRenderer.invoke('get-login-info');
+      if (loginInfo) {
+        document.getElementById('s_username').value = loginInfo.s_username || '';
+        document.getElementById('s_password').value = loginInfo.s_password || '';
+        document.getElementById('s_dbname').value = loginInfo.s_dbname || '';
+        document.getElementById('s_server').value = loginInfo.s_server || '';
+      }
+    };
+
+    // Save the login info when the form is submitted
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const loginInfo = {
+        s_username: document.getElementById('s_username').value,
+        s_password: document.getElementById('s_password').value,
+        s_dbname: document.getElementById('s_dbname').value,
+        s_server: document.getElementById('s_server').value
+      };
+      ipcRenderer.send('save-login-info', loginInfo);
+      alert('Login info saved successfully!');
+    });
+
+    // Close button event
+    document.getElementById('close-button').addEventListener('click', () => {
+      window.location.href = 'index.html'; // Redirect to index.html
+    });
+  </script>
+</body>
+</html>
